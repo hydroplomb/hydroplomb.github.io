@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HydroPlomb</title>
+<meta name="description" content="Registre des sollicitations HydroPlomb : déclaration, suivi et synthèse">
+<meta name="theme-color" content="#0A3550">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HydroPlomb">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icone-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  /* Page verrouillée : rien ne peut glisser de côté ni rebondir (iPhone) */
+  html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; overscroll-behavior: none; background: #F2F5F7; }
+  body { position: fixed; inset: 0; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); box-sizing: border-box; }
+  /* Sur iPhone, un cadre s'élargit à la taille de son contenu : 1px + min-width 100 % le garde à la largeur de l'écran */
+  iframe { position: relative; z-index: 1; display: block; width: 1px; min-width: 100%; max-width: 100%; height: 100%; border: 0; background: transparent; }
+  #attente { position: fixed; inset: 0; z-index: 0; display: grid; place-content: center; justify-items: center; gap: 14px; font: 600 16px system-ui, sans-serif; color: #0A3550; }
+  #attente img { width: 96px; height: 96px; border-radius: 22px; }
+</style>
+</head>
+<body>
+<div id="attente"><img src="icone-192.png" alt="">Ouverture de HydroPlomb…</div>
+<!-- L'application elle-même (Google Apps Script). Cette page ne fait que lui donner un nom et une icône. -->
+<iframe src="https://script.google.com/macros/s/AKfycbzegRkLxSnDUaqEdPZiiCcTpi02KFYlTcwSp8TCINjlLdmRhSZ2iToUdvBG0mi8lbJ/exec"
+        title="HydroPlomb" allow="clipboard-write"></iframe>
+</body>
+</html>
