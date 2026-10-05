@@ -17,17 +17,131 @@
 <style>
   /* Page verrouillée : rien ne peut glisser de côté ni rebondir (iPhone) */
   html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; overscroll-behavior: none; background: #F2F5F7; }
-  body { position: fixed; inset: 0; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); box-sizing: border-box; }
+  body { position: fixed; inset: 0; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
   /* Sur iPhone, un cadre s'élargit à la taille de son contenu : 1px + min-width 100 % le garde à la largeur de l'écran */
   iframe { position: relative; z-index: 1; display: block; width: 1px; min-width: 100%; max-width: 100%; height: 100%; border: 0; background: transparent; }
-  #attente { position: fixed; inset: 0; z-index: 0; display: grid; place-content: center; justify-items: center; gap: 14px; font: 600 16px system-ui, sans-serif; color: #0A3550; }
+  #attente { position: fixed; inset: 0; z-index: 0; display: grid; place-content: center; justify-items: center; gap: 14px; font-weight: 600; font-size: 16px; color: #0A3550; }
   #attente img { width: 96px; height: 96px; border-radius: 22px; }
+  /* Fenêtre Face ID */
+  #fid { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center; padding: 20px; padding-top: calc(20px + env(safe-area-inset-top, 0px)); background: rgba(242, 245, 247, 0.97); }
+  #fid[hidden] { display: none; }
+  .carte { width: 100%; max-width: 340px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #D5DEE4; border-radius: 16px; padding: 26px 22px; text-align: center; color: #13202B; }
+  .carte img { width: 72px; height: 72px; border-radius: 16px; }
+  .carte h1 { margin: 12px 0 6px; font-size: 22px; color: #0A3550; }
+  .carte p { margin: 0 0 18px; font-size: 16px; line-height: 1.45; color: #4F5F6B; }
+  .carte button { font: inherit; width: 100%; min-height: 48px; border-radius: 10px; cursor: pointer; }
+  #fidOk { border: none; background: #E8843A; color: #1A1006; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  #fidOk:disabled { opacity: 0.6; }
+  .lien { background: none; border: none; color: #0A3550; font-weight: 600; text-decoration: underline; margin-top: 8px; }
+  .petit { font-size: 14px !important; color: #4F5F6B !important; font-weight: 400 !important; }
+  .err { color: #8E1B1B !important; font-weight: 600; margin: 12px 0 0 !important; font-size: 15px !important; }
 </style>
 </head>
 <body>
 <div id="attente"><img src="icone-192.png" alt="">Ouverture de HydroPlomb…</div>
-<!-- L'application elle-même (Google Apps Script). Cette page ne fait que lui donner un nom et une icône. -->
+<!-- L'application elle-même (Google Apps Script). Cette page lui donne un nom, une icône et la connexion par Face ID. -->
 <iframe src="https://script.google.com/macros/s/AKfycbzegRkLxSnDUaqEdPZiiCcTpi02KFYlTcwSp8TCINjlLdmRhSZP2iToUdvBG0mi8lbJ/exec"
         title="HydroPlomb" allow="clipboard-write"></iframe>
+
+<div id="fid" hidden role="dialog" aria-modal="true" aria-labelledby="fidTitre">
+  <div class="carte">
+    <img src="icone-192.png" alt="">
+    <h1 id="fidTitre">HydroPlomb</h1>
+    <p id="fidTexte"></p>
+    <button id="fidOk" type="button">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3M9 9v1M15 9v1M12 9v4h-1M9 16c1.5 1 4.5 1 6 0"/></svg>
+      <span id="fidOkTexte"></span>
+    </button>
+    <button id="fidNon" class="lien" type="button"></button>
+    <button id="fidOff" class="lien petit" type="button" hidden>Désactiver Face ID sur cet iPhone</button>
+    <p id="fidErr" class="err" role="alert" hidden></p>
+  </div>
+</div>
+
+<script>
+/* Connexion par Face ID : la clé d'accès (passkey) est créée sur l'iPhone pour hydroplomb.github.io.
+   Face ID valide l'accès, puis cette page transmet les identifiants enregistrés à l'application. */
+(function () {
+  var CLE = 'hp_faceid', REFUS = 'hp_faceid_refus';
+  var $ = function (id) { return document.getElementById(id); };
+  var fid = $('fid'), texte = $('fidTexte'), ok = $('fidOk'), okTexte = $('fidOkTexte'), non = $('fidNon'), off = $('fidOff'), err = $('fidErr');
+  var app = null, origineApp = null, aEnvoyer = null, mode = null, aActiver = null;
+
+  function lire() { try { return JSON.parse(localStorage.getItem(CLE) || 'null'); } catch (e) { return null; } }
+  function ecrire(v) { try { if (v) localStorage.setItem(CLE, JSON.stringify(v)); else localStorage.removeItem(CLE); } catch (e) {} }
+  function versB64(buf) { var s = String.fromCharCode.apply(null, new Uint8Array(buf)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function depuisB64(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function alea(n) { var u = new Uint8Array(n); crypto.getRandomValues(u); return u; }
+  function disponible() { return !!(window.PublicKeyCredential && navigator.credentials && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable); }
+
+  function montrer(m) {
+    mode = m; err.hidden = true; ok.disabled = false;
+    var s = lire();
+    if (m === 'deverrouiller') {
+      texte.textContent = 'Connectez-vous en un regard' + (s ? ' (compte ' + s.ident + ')' : '') + '.';
+      okTexte.textContent = 'Se connecter avec Face ID';
+      non.textContent = 'Utiliser identifiant et mot de passe';
+      off.hidden = false;
+    } else {
+      texte.textContent = 'Activer Face ID sur cet iPhone ? Vous n\u2019aurez plus à saisir votre identifiant ni votre mot de passe.';
+      okTexte.textContent = 'Activer Face ID';
+      non.textContent = 'Plus tard';
+      off.hidden = true;
+    }
+    fid.hidden = false;
+    ok.focus();
+  }
+  function cacher() { fid.hidden = true; mode = null; }
+  function envoyer() {
+    if (aEnvoyer && app) { app.postMessage({ hp: 'identifiants', ident: aEnvoyer.ident, mdp: aEnvoyer.mdp }, origineApp); aEnvoyer = null; }
+  }
+
+  ok.addEventListener('click', function () {
+    ok.disabled = true; err.hidden = true;
+    if (mode === 'deverrouiller') {
+      var s = lire(); if (!s) { cacher(); return; }
+      navigator.credentials.get({ publicKey: { challenge: alea(32), allowCredentials: [{ type: 'public-key', id: depuisB64(s.id) }], userVerification: 'required', timeout: 60000 } })
+        .then(function () { aEnvoyer = { ident: s.ident, mdp: s.mdp }; cacher(); envoyer(); })
+        .catch(function () { ok.disabled = false; err.textContent = 'Face ID n\u2019a pas abouti. Réessayez, ou utilisez votre mot de passe.'; err.hidden = false; });
+    } else if (mode === 'activer' && aActiver) {
+      navigator.credentials.create({ publicKey: {
+          rp: { name: 'HydroPlomb' },
+          user: { id: alea(16), name: aActiver.ident, displayName: aActiver.ident },
+          challenge: alea(32),
+          pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
+          attestation: 'none', timeout: 60000 } })
+        .then(function (c) { ecrire({ id: versB64(c.rawId), ident: aActiver.ident, mdp: aActiver.mdp }); aActiver = null; cacher(); })
+        .catch(function () { ok.disabled = false; err.textContent = 'L\u2019activation n\u2019a pas abouti. Vous pourrez réessayer à la prochaine connexion.'; err.hidden = false; });
+    }
+  });
+  non.addEventListener('click', function () {
+    if (mode === 'activer' && aActiver) { try { sessionStorage.setItem(REFUS, aActiver.ident); } catch (e) {} aActiver = null; }
+    cacher();
+  });
+  off.addEventListener('click', function () { ecrire(null); cacher(); });
+
+  // Messages de l'application (Google Apps Script)
+  window.addEventListener('message', function (e) {
+    if (!/^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(e.origin)) return;
+    var d = e.data || {};
+    app = e.source; origineApp = e.origin;
+    if (d.hp === 'pret') {
+      if (lire() && disponible()) montrer('deverrouiller'); else cacher();
+      envoyer();
+    } else if (d.hp === 'connecte' && d.ident && d.mdp) {
+      var s = lire();
+      if (s) { if (s.ident === d.ident && s.mdp !== d.mdp) { s.mdp = String(d.mdp); ecrire(s); } return; }
+      var refus = ''; try { refus = sessionStorage.getItem(REFUS) || ''; } catch (x) {}
+      if (refus === d.ident || !disponible()) return;
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (oui) {
+        if (oui) { aActiver = { ident: String(d.ident), mdp: String(d.mdp) }; montrer('activer'); }
+      });
+    } else if (d.hp === 'echec') {
+      ecrire(null);
+    }
+  });
+})();
+</script>
 </body>
 </html>
