@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HydroPlomb – Démonstration</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0A3550">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon.png">
+<link rel="apple-touch-icon" href="../icone-180.png">
+<script>
+  /* Premier signe de vie, avant tout le reste : la page d'accueil sait que l'application s'ouvre. */
+  try { if (window.top !== window.self) window.top.postMessage({ hp: 'bonjour' }, 'https://hydroplomb.github.io'); } catch (e) {}
+</script>
+<!-- Polices chargées sans bloquer l'affichage : si Google Fonts ne répond pas, les polices du téléphone sont utilisées. -->
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+  :root{--navy:#0A3550;--orange:#E8843A;--ground:#F2F5F7;--surface:#FFFFFF;--ink:#13202B;--muted:#4F5F6B;--line:#D5DEE4;
+        --new-bg:#DCE8F5;--new-ink:#0A3550;--prog-bg:#FCE9D6;--prog-ink:#7A3A0C;--done-bg:#DDF0E3;--done-ink:#1D5C33;--urg-bg:#FBDADA;--urg-ink:#8E1B1B;
+        padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:'Source Sans 3',-apple-system,system-ui,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;line-height:1.45}
+  h1,h2,.num{font-family:'Archivo',-apple-system,system-ui,'Arial Narrow',Arial,sans-serif}
+  :focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+  header{background:var(--navy);color:#fff;padding:22px 18px 26px}
+  .wrap{max-width:720px;margin:0 auto}
+  .brand{display:flex;align-items:center;gap:8px;color:#C9D8E3;font-weight:600;margin:0 0 4px}
+  header h1{margin:0;font-size:28px;font-weight:800;line-height:1.1;overflow-wrap:anywhere}
+  .head-row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+  .client-label{margin:6px 0 0;color:#C9D8E3}
+  .logout{font:inherit;font-weight:600;background:transparent;color:#fff;border:1px solid #7F9BB0;border-radius:8px;padding:8px 12px;min-height:44px;cursor:pointer;white-space:nowrap}
+  main{padding:0 14px 40px}
+  .demo{background:var(--prog-bg);color:var(--prog-ink);border-radius:10px;padding:10px 14px;margin:14px 0 0;font-weight:600}
+  .info{background:var(--new-bg);color:var(--new-ink);border-radius:10px;padding:10px 14px;margin:14px 0 0;font-weight:600;font-size:15px}
+  .info .link{padding:0 4px;min-height:0}
+  .empty .btn{width:auto;margin-top:10px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:-12px}
+  .tabs{display:flex;gap:6px;margin:16px 0 12px}
+  .tab{flex:1;font:inherit;font-weight:700;padding:10px;min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+  .tab[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+  label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:15px;margin-bottom:12px}
+  input,select,textarea{font:inherit;font-weight:400;padding:10px 12px;min-height:46px;border:1px solid var(--line);border-radius:8px;background:var(--ground);color:var(--ink);width:100%}
+  textarea{min-height:96px;resize:vertical}
+  .choices{display:flex;gap:8px}
+  .choices label{flex:1;flex-direction:row;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);border-radius:8px;min-height:46px;margin:0;cursor:pointer}
+  .choices input{width:auto;min-height:0}
+  fieldset{border:none;padding:0;margin:0 0 12px}
+  legend{font-weight:600;font-size:15px;margin-bottom:6px;padding:0}
+  .btn{font:inherit;font-weight:700;border:none;border-radius:10px;padding:12px 18px;min-height:48px;cursor:pointer;width:100%;background:var(--orange);color:#1A1006}
+  .btn.sec{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .btn:disabled{opacity:.55;cursor:wait}
+  .msg{border-radius:8px;padding:12px 14px;margin-bottom:12px;font-weight:600}
+  .msg.err{background:var(--urg-bg);color:var(--urg-ink)}
+  .msg.ok{background:var(--done-bg);color:var(--done-ink)}
+  .count{margin:0 0 12px}
+  .count strong{font-family:'Archivo',sans-serif;font-size:30px;margin-right:6px}
+  .item{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px;background:var(--surface)}
+  .item .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .item .no{font-family:'Archivo',sans-serif;font-weight:700}
+  .item .d{color:var(--muted);font-size:14px}
+  .item .cli{font-weight:700;color:var(--navy);margin-top:4px}
+  .item .need{font-weight:600;margin:4px 0 2px}
+  .item .meta{color:var(--muted);font-size:14px}
+  .item .meta a{color:var(--navy);font-weight:600}
+  .item .det{font-size:15px;margin:2px 0;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .item .obs{font-size:15px;margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+  .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .badge{padding:2px 10px;border-radius:999px;font-size:14px;font-weight:600}
+  .b-Nouvelle{background:var(--new-bg);color:var(--new-ink)}
+  .b-En-cours{background:var(--prog-bg);color:var(--prog-ink)}
+  .b-Terminée{background:var(--done-bg);color:var(--done-ink)}
+  .b-urg{background:var(--urg-bg);color:var(--urg-ink)}
+  .b-fact{background:#E6F0FF;color:#0A3550}
+  .b-nonfact{background:#ECEFF2;color:#4F5F6B}
+  .b-pay0{background:#FDECEC;color:#9B1C1C}
+  .b-pay1{background:#FFF1E0;color:#8A4B0F}
+  .b-pay2{background:var(--done-bg);color:var(--done-ink)}
+  .payblock{margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--ground)}
+  .empty{color:var(--muted);text-align:center;padding:20px}
+  .link{background:none;border:none;color:var(--navy);font:inherit;font-weight:600;text-decoration:underline;cursor:pointer;padding:8px 0;min-height:44px}
+  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .stat strong{display:block;font-family:'Archivo',sans-serif;font-size:26px;line-height:1.1}
+  .stat span{color:var(--muted);font-size:14px}
+  .filters{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font:inherit;font-weight:600;padding:6px 12px;min-height:40px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+  .chip[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .frow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+  .edit{margin-top:10px;padding-top:12px;border-top:1px dashed var(--line)}
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .actions{display:flex;gap:8px}
+  .tot{margin:0 0 12px;font-weight:600}
+  .saved{color:var(--done-ink);font-weight:700;margin-top:6px}
+  .stats4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .month-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+  .month-nav h2{margin:0;font-size:20px;text-align:center;flex:1}
+  .icon-btn{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:22px;line-height:1;cursor:pointer}
+  .sh{font-family:'Archivo',sans-serif;font-size:17px;margin:18px 0 8px}
+  .scroll{overflow-x:auto}
+  .tbl{width:100%;border-collapse:collapse;font-size:15px}
+  .tbl th,.tbl td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  .tbl th{color:var(--muted);font-weight:600;font-size:14px;white-space:nowrap}
+  .tbl .num{text-align:right;white-space:nowrap}
+  .note{color:var(--muted);font-size:14px;margin:10px 0 0}
+  .bars{display:flex;flex-direction:column;gap:8px}
+  .bar-row{display:grid;grid-template-columns:minmax(0,40%) minmax(0,1fr) 32px;gap:10px;align-items:center}
+  .bar-lab{font-size:15px;overflow-wrap:anywhere}
+  .bar-track{height:18px;background:var(--ground);border-radius:6px;overflow:hidden}
+  .bar-fill{display:block;height:100%;background:var(--navy);border-radius:6px}
+  .bar-val{font-family:'Archivo',sans-serif;font-weight:700;text-align:right}
+  .bar-fill.alt{background:var(--orange)}
+  .dicte{display:flex;align-items:center;gap:5px;margin:-6px 0 12px;color:var(--muted);font-size:12.5px;font-style:italic}
+  .dicte svg{flex-shrink:0;width:13px;height:13px;color:var(--orange)}
+  @media (max-width:520px){ .stats4{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:520px){ .grid3{grid-template-columns:1fr} .frow{grid-template-columns:1fr} }
+  /* Largeur verrouillée : rien ne dépasse de l'écran du téléphone (pas de balancement gauche-droite) */
+  html,body{max-width:100%;overflow-x:hidden}
+  html{touch-action:pan-y pinch-zoom}
+  body{overflow-wrap:anywhere}
+  .tab{min-width:0;overflow-wrap:normal}
+  .grid2>*,.grid3>*,.frow>*,.stats>*,.actions>*,label{min-width:0}
+  input,select,textarea{max-width:100%;min-width:0;font-size:16px}
+  input[type=date]{-webkit-appearance:none;appearance:none;display:block}
+  .choices{flex-wrap:wrap}
+  .choices label{flex:1 1 auto;min-width:0;padding:0 10px;text-align:center}
+  .tbl th,.tbl td{overflow-wrap:normal}
+  @media (max-width:420px){ .tab{font-size:14px;padding:10px 4px} main{padding:0 10px 40px} .card{padding:14px} }
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <p class="brand"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7C12 2.7 5 10.2 5 14.5a7 7 0 0 0 14 0C19 10.2 12 2.7 12 2.7z"/></svg>HydroPlomb</p>
+    <div class="head-row">
+      <div>
+        <h1 id="titre">Espace client</h1>
+        <p class="client-label" id="sousTitre">Connectez-vous pour déclarer et suivre vos sollicitations.</p>
+      </div>
+      <button class="logout" type="button" id="bLogout" hidden>Se déconnecter</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="info" id="cacheInfo" role="status" hidden></p>
+  <p class="demo" id="demo" hidden>Aperçu : rien n'est enregistré dans le registre. Tapez « admin » comme identifiant pour voir l'espace HydroPlomb, ou n'importe quel autre pour l'espace client.</p>
+
+  <!-- Connexion -->
+  <section class="card" id="vLogin" style="margin-top:16px">
+    <div class="msg err" id="loginErr" role="alert" hidden></div>
+    <form id="fLogin">
+      <label>Identifiant<input type="text" id="ident" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+      <label>Mot de passe<input type="password" id="mdp" autocomplete="current-password" required></label>
+      <button class="btn" type="submit" id="bLogin">Accéder</button>
+    </form>
+  </section>
+
+  <!-- Ouverture d'une session gardée (Face ID ou session du navigateur) -->
+  <section class="card" id="vOuverture" style="margin-top:16px" hidden>
+    <p class="empty" id="ouvTxt" role="status">Ouverture de votre espace…</p>
+    <div id="ouvBoutons" hidden>
+      <button class="btn" type="button" id="bOuvRetry">Réessayer</button>
+      <button class="link" type="button" id="bOuvMdp">Utiliser identifiant et mot de passe</button>
+    </div>
+  </section>
+
+  <!-- Application -->
+  <div id="vApp" hidden>
+    <div class="tabs">
+      <button class="tab" type="button" id="tAdmin" aria-pressed="false" hidden>Sollicitations</button>
+      <button class="tab" type="button" id="tDecl" aria-pressed="true">Déclarer</button>
+      <button class="tab" type="button" id="tSuivi" aria-pressed="false">Suivi</button>
+      <button class="tab" type="button" id="tSynth" aria-pressed="false">Synthèse</button>
+    </div>
+
+    <!-- Espace administrateur -->
+    <section id="vAdmin" hidden>
+      <div class="stats">
+        <div class="stat"><strong id="sNew">0</strong><span>À traiter</span></div>
+        <div class="stat"><strong id="sProg">0</strong><span>En cours</span></div>
+        <div class="stat"><strong id="sMois">0</strong><span>Ce mois-ci</span></div>
+      </div>
+      <div class="filters">
+        <div class="chips" id="fStatut" role="group" aria-label="Filtrer par statut"></div>
+        <div class="frow">
+          <label style="margin:0"><span class="sr" hidden>Client</span><select id="fClient" aria-label="Filtrer par client"></select></label>
+          <label style="margin:0"><input type="search" id="fQ" placeholder="Rechercher un site, un détail…" aria-label="Rechercher"></label>
+        </div>
+      </div>
+      <div id="aList"></div>
+      <button class="link" type="button" id="bARefresh">Actualiser</button>
+    </section>
+
+    <section class="card" id="vDecl" style="margin-top:0">
+      <div class="msg" id="declMsg" role="status" hidden></div>
+      <form id="fDecl">
+        <label id="lClient" hidden>Client<select name="client" id="selClient"></select></label>
+        <label>Nom de la personne sur place<input type="text" name="nom" maxlength="80" required autocomplete="name"></label>
+        <label>Contact de la personne sur place<input type="tel" name="contact" maxlength="60" required inputmode="tel" placeholder="Ex. 07 00 00 00 00"></label>
+        <label>Chantier ou site<input type="text" name="site" maxlength="150" required placeholder="Ex. Résidence Les Palmiers, bâtiment B"></label>
+        <p class="dicte"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Vous pouvez dicter : touchez le micro de votre clavier.</p>
+        <label>Catégorie<select name="categorie" id="cat"></select></label>
+        <fieldset>
+          <legend>Urgence</legend>
+          <div class="choices">
+            <label><input type="radio" name="urgence" value="Normale" checked> Normale</label>
+            <label><input type="radio" name="urgence" value="Urgente"> Urgente</label>
+          </div>
+        </fieldset>
+        <label>Détails<textarea name="details" maxlength="2000" required placeholder="Décrivez le problème : constat, emplacement précis, depuis quand…"></textarea></label>
+        <p class="dicte"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Vous pouvez dicter : touchez le micro de votre clavier.</p>
+        <button class="btn" type="submit" id="bDecl">Envoyer la sollicitation</button>
+      </form>
+    </section>
+
+    <section id="vSuivi" hidden>
+      <div class="card" style="margin-top:0">
+        <p class="count"><strong id="duMois">0</strong>sollicitation(s) déclarée(s) ce mois-ci</p>
+        <div id="list"></div>
+        <button class="link" type="button" id="bRefresh">Actualiser</button>
+      </div>
+    </section>
+
+    <!-- Synthèse mensuelle -->
+    <section id="vSynth" hidden>
+      <div class="card" style="margin-top:0">
+        <div class="month-nav">
+          <button class="icon-btn" type="button" id="mPrev" aria-label="Mois précédent">‹</button>
+          <h2 id="mLabel">Mois</h2>
+          <button class="icon-btn" type="button" id="mNext" aria-label="Mois suivant">›</button>
+        </div>
+        <label id="lSynClient" hidden>Client<select id="synClient"></select></label>
+        <div id="synBody"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+  var JETON = '', DURABLE = false, ADMIN = false, CFG = null, VUE = '';
+  var ETAT = null;      // dernière situation reçue : { j, le, cfg, suivi, suiviLe, admin, adminLe }
+  var DEPUIS = 0;       // heure des données gardées affichées (0 : données à jour)
+  var OPID = null;      // identifiant de l'envoi en cours (pas de doublon en cas de nouvel essai)
+  var ADATA = { items: [], clients: [] }, AF = { statut: 'Toutes', client: '', q: '' }, OUVERT = null;
+  var DEMO = !(window.google && google.script && google.script.run);
+  var DEMO_ADMIN = false;
+  // Données fictives utilisées uniquement pour l'aperçu ; en service, tout vient du registre.
+  var DEMO_CATEGORIES = ["Manque d'eau","Fuite sur compteur","Compteur cassé","Fuite ou baisse de pression","Branchement simple","Abonnement simple","Branchement et abonnement","Facture élevée","Facture non reçue","Mutation","Résiliation","Adduction","Extension","Déplacement réseau","Conception ou plans","Travaux de plomberie","Entretien","Autre"];
+  var DEMO_CLIENTS = ['Entreprise exemple', 'Client de démonstration'];
+  var demoItems = (function(){
+    function it(n, jours, h, client, decl, site, cat, urg, det, statut, finJours, mat, mo, aut, fact, pay, verse, obs){
+      var d = new Date(Date.now() - jours*864e5), f = finJours == null ? null : new Date(Date.now() - finJours*864e5);
+      var iso = function(x){ return x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2)+'-'+('0'+x.getDate()).slice(-2); };
+      return { numero: n, date: ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear()+' à '+h,
+        mois: iso(d).slice(0,7), client: client, declarant: decl, nom: 'Personne sur place (exemple)', contact: '07 00 00 00 0'+n, site: site,
+        categorie: cat, urgence: urg, details: det, statut: statut, dateFin: f ? iso(f).split('-').reverse().join('/') : '', dateFinIso: f ? iso(f) : '',
+        materiel: mat, mainOeuvre: mo, autres: aut, total: (mat||0)+(mo||0)+(aut||0), observations: obs || '', canal: 'Application HydroPlomb',
+        facturation: fact || '', paiement: pay || '', verse: verse || '' };
+    }
+    return [
+      it(8, 0, '08:40', 'Entreprise exemple', 'Utilisateur exemple', 'Chantier exemple, bâtiment A', 'Fuite sur compteur', 'Urgente', 'Exemple : fuite visible au niveau du compteur, sol mouillé.', 'Nouvelle'),
+      it(7, 1, '15:10', 'Client de démonstration', 'Responsable exemple', 'Site exemple, entrée principale', "Manque d'eau", 'Urgente', 'Exemple : plus d’eau depuis ce matin dans les sanitaires.', 'En cours', null, '', '', '', '', '', '', 'Exemple : équipe envoyée sur place.'),
+      it(6, 3, '10:25', 'Entreprise exemple', 'Utilisateur exemple', 'Chantier exemple, bâtiment B', 'Travaux de plomberie', 'Normale', 'Exemple : remplacement d’un robinet d’arrêt.', 'Terminée', 1, 15000, 10000, 0, 'Facturable', 'Soldé', 25000, 'Exemple : robinet remplacé, essai d’étanchéité concluant.'),
+      it(5, 6, '09:00', 'Client de démonstration', 'Responsable exemple', 'Site exemple, local technique', 'Fuite ou baisse de pression', 'Normale', 'Exemple : pression faible au 2e étage.', 'Terminée', 4, 8000, 12000, 2000, 'Facturable', 'Acompte versé', 10000, 'Exemple : réducteur de pression réglé.'),
+      it(4, 9, '14:45', 'Entreprise exemple', 'Autre utilisateur exemple', 'Chantier exemple, cour', 'Entretien', 'Normale', 'Exemple : entretien du surpresseur.', 'Terminée', 8, 0, 0, 0, 'Non facturable', '', '', 'Exemple : visite comprise dans le contrat.'),
+      it(3, 35, '11:30', 'Client de démonstration', 'Responsable exemple', 'Site exemple, cuisine', 'Compteur cassé', 'Urgente', 'Exemple : vitre du compteur brisée.', 'Terminée', 33, 20000, 8000, 0, 'Facturable', 'Non payé'),
+      it(2, 38, '16:05', 'Entreprise exemple', 'Utilisateur exemple', 'Chantier exemple, bâtiment A', 'Facture élevée', 'Normale', 'Exemple : facture du mois deux fois plus élevée.', 'Terminée', 30, 0, 5000, 0, 'Facturable', 'Soldé', 5000, 'Exemple : fuite après compteur trouvée et réparée.'),
+      it(1, 41, '08:15', 'Client de démonstration', 'Responsable exemple', 'Site exemple', 'Branchement simple', 'Normale', 'Exemple : nouveau point d’eau à brancher.', 'Terminée', 36, 35000, 15000, 5000, 'Facturable', 'Soldé', 55000)
+    ];
+  })();
+
+  function $(id){ return document.getElementById(id); }
+  function el(t,c,txt){ var e=document.createElement(t); if(c) e.className=c; if(txt!=null) e.textContent=txt; return e; }
+  function pad(n){ return ('00'+n).slice(-3); }
+  function money(n){ return Math.round(n).toLocaleString('fr-FR')+' FCFA'; }
+  function show(box, text, kind){ box.textContent=text; box.className='msg '+kind; box.hidden=false; }
+  function two(n){ return ('0'+n).slice(-2); }
+  function nb(v){ var n=Number(v); return isFinite(n)&&n>0?n:0; }
+  function telHref(c){ return 'tel:'+String(c).replace(/[^0-9+]/g,''); }
+  function waHref(c){ var d=String(c).replace(/[^0-9+]/g,''); if(d.indexOf('+')===0) d=d.slice(1); else if(d.indexOf('00')===0) d=d.slice(2); else if(d.length===10) d='225'+d; return 'https://wa.me/'+d; }
+  function fillSelect(sel, values, first){ var cur=sel.value; sel.textContent=''; if(first!=null){ var o0=el('option',null,first); o0.value=''; sel.appendChild(o0); } values.forEach(function(v){ var o=el('option',null,v); o.value=v; sel.appendChild(o); }); if(cur && values.indexOf(cur)>=0) sel.value=cur; }
+  function ssGet(k){ try { return sessionStorage.getItem(k); } catch(e){ return null; } }
+  function ssSet(k,v){ try { if(v==null) sessionStorage.removeItem(k); else sessionStorage.setItem(k,v); } catch(e){} }
+  function quand(t){ var d=new Date(t), n=new Date(); return (d.toDateString()===n.toDateString() ? 'aujourd’hui' : 'le '+two(d.getDate())+'/'+two(d.getMonth()+1))+' à '+two(d.getHours())+' h '+two(d.getMinutes()); }
+
+  /* ---------- Erreurs ---------- */
+  function texteErr(e){ return String((e && e.message) || e || ''); }
+  function errText(e){
+    var m = texteErr(e).replace(/^(Exception|Error):\s*/,'');
+    if (m.indexOf('REFUS: ') >= 0) return m.slice(m.indexOf('REFUS: ') + 7);
+    if (/SESSION/.test(m)) return 'Votre connexion a expiré. Reconnectez-vous.';
+    if (m === 'DELAI') return 'Le serveur met trop de temps à répondre (réseau lent). Vérifiez votre connexion, puis réessayez.';
+    if (!m || /network|réseau|connexion|connection|HTTP|fetch|timeout|timed out|unavailable|Lock/i.test(m)) return 'Le serveur ne répond pas. Vérifiez votre connexion (Wi-Fi ou données mobiles), puis réessayez.';
+    return m;
+  }
+  /* Message d'erreur avec un bouton « Réessayer », à la place d'une liste */
+  function erreurBloc(box, e, refaire){
+    box.textContent=''; var p=el('div','empty'); p.appendChild(el('div',null,errText(e)));
+    var b=el('button','btn sec','Réessayer'); b.type='button'; b.addEventListener('click', refaire); p.appendChild(b); box.appendChild(p);
+  }
+  /* Bandeau en haut de l'écran : données gardées, connexion lente… */
+  function bandeau(txt, reessayer){
+    var b=$('cacheInfo'); if(!txt){ b.hidden=true; b.textContent=''; return; }
+    b.textContent=txt;
+    if(reessayer){ var l=el('button','link','Réessayer'); l.type='button'; l.addEventListener('click', reessayer); b.appendChild(document.createTextNode(' ')); b.appendChild(l); }
+    b.hidden=false;
+  }
+
+  /* ---------- Appels au serveur Google ----------
+     Sur le réseau mobile, un appel peut rester sans réponse : chaque appel a un délai maximal,
+     puis deux nouveaux essais (après 1 s, puis 3 s). Jamais de nouvel essai pour un refus du
+     serveur (« REFUS: ») ou une session expirée. Les envois portent un identifiant (opId) :
+     un nouvel essai ne crée jamais de doublon. */
+  var DELAIS = { apiConnexion: 15000, apiReprendre: 12000, apiSuivi: 12000, apiSynthese: 15000, apiAdminListe: 15000,
+                 apiDeclarer: 45000, apiAdminMaj: 30000, apiJetonDurable: 15000, apiDeconnexion: 10000 };
+  function appel(name, args, ok, ko){
+    var fini = false;
+    var t = setTimeout(function(){ if(!fini){ fini = true; ko(new Error('DELAI')); } }, DELAIS[name] || 20000);
+    try {
+      var r = google.script.run
+        .withSuccessHandler(function(v){ if(fini) return; fini = true; clearTimeout(t); ok(v); })
+        .withFailureHandler(function(e){ if(fini) return; fini = true; clearTimeout(t); ko(e); });
+      r[name].apply(r, args);
+    } catch(e) { if(!fini){ fini = true; clearTimeout(t); ko(e); } }
+  }
+  function api(name, args, ok, ko, surReprise){
+    if (DEMO) return demo(name, args, ok, ko);
+    var essai = 0;
+    (function go(){
+      appel(name, args, ok, function(e){
+        var m = texteErr(e);
+        if (m.indexOf('REFUS: ') >= 0 || /SESSION/.test(m) || essai >= 2) {
+          if (/SESSION/.test(m) && name !== 'apiDeconnexion') sessionExpiree();
+          ko(e); return;
+        }
+        essai++;
+        if (surReprise) surReprise(essai);
+        setTimeout(go, essai === 1 ? 1000 : 3000);
+      });
+    })();
+  }
+
+  /* ---------- Aperçu (hors Google Apps Script) : simulation avec les données fictives ---------- */
+  function demoCfg(){ return { client: DEMO_ADMIN?'HydroPlomb':'Entreprise exemple', admin: DEMO_ADMIN, utilisateur: DEMO_ADMIN?'HydroPlomb':'Utilisateur exemple', categories: DEMO_CATEGORIES, clients: DEMO_ADMIN?DEMO_CLIENTS:[] }; }
+  function demo(name, args, ok, ko){
+    setTimeout(function(){
+      try {
+        if (name==='apiConnexion') { DEMO_ADMIN = String(args[0]).toLowerCase()==='admin'; var c=demoCfg(); c.jeton='demo'; return ok(c); }
+        if (name==='apiReprendre') return ok(demoCfg());
+        if (name==='apiDeclarer') {
+          var d=args[1], now=new Date();
+          var it={ numero: demoItems.length+1, date: two(now.getDate())+'/'+two(now.getMonth()+1)+'/'+now.getFullYear()+' à '+two(now.getHours())+':'+two(now.getMinutes()),
+            mois: now.getFullYear()+'-'+two(now.getMonth()+1), client: DEMO_ADMIN?d.client:'Entreprise exemple', nom:d.nom, contact:d.contact, site:d.site, categorie:d.categorie, urgence:d.urgence, details:d.details,
+            statut:'Nouvelle', dateFin:'', dateFinIso:'', materiel:'', mainOeuvre:'', autres:'', total:0, observations:'', canal: DEMO_ADMIN?'Saisie HydroPlomb':'Application HydroPlomb', declarant: DEMO_ADMIN?'HydroPlomb':'Utilisateur exemple' };
+          demoItems.unshift(it); return ok(it.numero);
+        }
+        var moisCourant = new Date().getFullYear()+'-'+two(new Date().getMonth()+1);
+        if (name==='apiSuivi') { var mine=demoItems.filter(function(x){ return x.client==='Entreprise exemple'; }); return ok({ duMois: mine.filter(function(x){ return x.mois===moisCourant; }).length, items: mine }); }
+        if (name==='apiSynthese') { var mm=args[1], cc=DEMO_ADMIN?(args[2]||''):'Entreprise exemple'; return ok({ mois: mm, client: cc||'Tous les clients', items: demoItems.filter(function(x){ return x.mois===mm && (!cc || x.client===cc); }) }); }
+        if (name==='apiAdminListe') return ok({ items: demoItems, clients: DEMO_CLIENTS, stats: {
+          aTraiter: demoItems.filter(function(x){return x.statut==='Nouvelle';}).length,
+          enCours: demoItems.filter(function(x){return x.statut==='En cours';}).length, duMois: demoItems.filter(function(x){ return x.mois===moisCourant; }).length } });
+        if (name==='apiAdminMaj') {
+          var num=args[1], m=args[2], x=demoItems.filter(function(y){ return y.numero===num; })[0];
+          x.statut=m.statut; x.dateFinIso=m.dateFin || (m.statut==='Terminée' ? now2iso() : '');
+          x.dateFin=x.dateFinIso? x.dateFinIso.split('-').reverse().join('/') : '';
+          x.materiel=m.materiel; x.mainOeuvre=m.mainOeuvre; x.autres=m.autres; x.observations=m.observations; x.facturation=m.facturation;
+          x.total=nb(m.materiel)+nb(m.mainOeuvre)+nb(m.autres);
+          x.paiement=m.facturation==='Facturable'?(m.paiement||'Non payé'):''; x.verse=x.paiement==='Acompte versé'?nb(m.verse):(x.paiement==='Soldé'&&x.total?x.total:'');
+          return ok(x);
+        }
+        return ok(true);
+      } catch(e){ ko(e); }
+    }, 300);
+  }
+  function now2iso(){ var n=new Date(); return n.getFullYear()+'-'+two(n.getMonth()+1)+'-'+two(n.getDate()); }
+
+  /* ---------- Session ---------- */
+  // Dernière situation : gardée pour la session du navigateur et, avec Face ID, par la page d'accueil.
+  function garder(){
+    if (!ETAT || !JETON || DEMO) return;
+    ETAT.j = JETON; ETAT.le = Date.now();
+    try { ssSet('hp_etat', JSON.stringify(ETAT)); } catch(e) {}
+    if (DURABLE) signal({hp:'etat', g: ETAT});
+  }
+  function oublier(){
+    JETON=''; DURABLE=false; ETAT=null; CFG=null;
+    ['hp_jeton','hp_durable','hp_etat','hp_id','hp_mdp'].forEach(function(k){ ssSet(k, null); });
+  }
+  function sessionExpiree(){
+    var avait = !!JETON, etaitDurable = DURABLE;
+    oublier();
+    if (etaitDurable) signal({hp:'echec'});
+    afficherConnexion();
+    if (avait) show($('loginErr'), 'Votre connexion a expiré. Reconnectez-vous avec votre identifiant et votre mot de passe.', 'err');
+  }
+
+  // Échanges avec la page d'accueil HydroPlomb (icône, surveillance de l'ouverture, Face ID)
+  var WRAP = 'https://hydroplomb.github.io';
+  function signal(m){ try { if (window.top !== window.self) window.top.postMessage(m, WRAP); } catch(e) {} }
+  window.addEventListener('message', function(e){
+    if (e.origin !== WRAP) return;
+    var d = e.data || {};
+    if (d.hp === 'porte-prete') { signal({hp:'bonjour'}); if (!JETON && !$('vLogin').hidden) signal({hp:'pret'}); }
+    else if (d.hp === 'jeton' && d.jeton && !JETON) reprendre(String(d.jeton), true, d.etat);
+    else if (d.hp === 'identifiants' && d.ident && d.mdp && !JETON) connecter(String(d.ident), String(d.mdp), 'ancien');
+    else if (d.hp === 'faceid-active' && JETON && !DURABLE) rendreDurable();
+    else if (d.hp === 'oublier' && d.jeton && !DEMO) appel('apiDeconnexion', [String(d.jeton)], function(){}, function(){});
+  });
+
+  /* Met la configuration à l'écran (premier : choisit l'onglet de départ) */
+  function entrer(cfg, premier){
+    CFG = cfg; ADMIN = !!cfg.admin;
+    fillSelect($('cat'), cfg.categories);
+    $('titre').textContent = ADMIN ? 'Espace HydroPlomb' : cfg.client;
+    $('sousTitre').textContent = (ADMIN ? 'Administration HydroPlomb – ' : '') + 'Connecté : ' + (cfg.utilisateur || cfg.client);
+    $('bLogout').hidden = false;
+    $('lClient').hidden = !ADMIN;
+    $('tAdmin').hidden = !ADMIN; $('tSuivi').hidden = ADMIN;
+    if (ADMIN) { fillSelect($('selClient'), cfg.clients || [], 'Choisir le client'); fillSelect($('fClient'), cfg.clients || [], 'Tous les clients'); }
+    fillSelect($('synClient'), ADMIN ? (cfg.clients || []) : [], 'Tous les clients'); $('lSynClient').hidden = !ADMIN;
+    $('vLogin').hidden = true; $('vOuverture').hidden = true; $('vApp').hidden = false;
+    if (premier || (VUE==='admin' && !ADMIN) || (VUE==='suivi' && ADMIN)) onglet(ADMIN ? 'admin' : 'decl');   // rôle changé depuis la dernière ouverture
+  }
+
+  function connecter(ident, mdp, source){
+    $('bLogin').disabled = true; $('bLogin').textContent = 'Connexion…';
+    api('apiConnexion', [ident, mdp], function(cfg){
+      $('bLogin').disabled = false; $('bLogin').textContent = 'Accéder';
+      JETON = cfg.jeton; DURABLE = false; delete cfg.jeton;
+      ssSet('hp_jeton', JETON); ssSet('hp_durable', null);
+      $('loginErr').hidden = true; $('mdp').value = '';
+      ETAT = { cfg: cfg }; garder();
+      entrer(cfg, true);
+      if (source === 'form') signal({hp:'connecte', ident: ident});
+      if (source === 'ancien') rendreDurable();   // ancien Face ID (mot de passe gardé) : remplacé par un jeton
+    }, function(e){
+      $('bLogin').disabled = false; $('bLogin').textContent = 'Accéder';
+      if (source === 'ancien' && texteErr(e).indexOf('REFUS: ') >= 0) signal({hp:'echec'});
+      show($('loginErr'), errText(e), 'err');
+    }, function(n){ $('bLogin').textContent = 'Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…'; });
+  }
+
+  /* Face ID activé sur la page d'accueil : elle gardera un jeton durable, jamais le mot de passe. */
+  function rendreDurable(){
+    api('apiJetonDurable', [JETON], function(r){
+      JETON = r.jeton; DURABLE = true; ssSet('hp_jeton', JETON); ssSet('hp_durable', '1');
+      signal({hp:'jeton-durable', jeton: JETON});
+      garder();
+    }, function(){ signal({hp:'faceid-impossible'}); });
+  }
+
+  /* Reprise d'une session (jeton de la session du navigateur, ou de Face ID) :
+     la dernière situation connue s'affiche tout de suite, puis se met à jour. */
+  function reprendre(jeton, durable, g){
+    JETON = jeton; DURABLE = !!durable;
+    ssSet('hp_jeton', JETON); ssSet('hp_durable', DURABLE ? '1' : null);
+    if (g && g.j === jeton && g.cfg) {
+      ETAT = g; DEPUIS = g.le || Date.now();
+      entrer(g.cfg, true);
+      bandeau('Dernières données : ' + quand(DEPUIS) + '. Mise à jour en cours…');
+    } else {
+      ETAT = { };
+      $('vLogin').hidden = true; $('vOuverture').hidden = false; $('ouvTxt').textContent = 'Ouverture de votre espace…'; $('ouvBoutons').hidden = true;
+    }
+    actualiserSession();
+  }
+  function actualiserSession(){
+    api('apiReprendre', [JETON], function(cfg){
+      var premier = !CFG;
+      ETAT = ETAT || {}; ETAT.cfg = cfg;
+      entrer(cfg, premier);
+      DEPUIS = 0; bandeau(''); garder();
+    }, function(e){
+      if (/SESSION/.test(texteErr(e))) return;   // déjà traité : retour à l'écran de connexion
+      if (CFG) bandeau('Pas de connexion pour l’instant. Dernières données : ' + quand(DEPUIS) + '.', function(){ bandeau('Nouvel essai de connexion…'); actualiserSession(); });
+      else { $('ouvTxt').textContent = errText(e); $('ouvBoutons').hidden = false; }
+    }, function(n){
+      if (CFG) bandeau('Connexion lente, nouvel essai (' + (n+1) + ' sur 3)… Dernières données : ' + quand(DEPUIS) + '.');
+      else $('ouvTxt').textContent = 'Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…';
+    });
+  }
+  $('bOuvRetry').addEventListener('click', function(){ $('ouvBoutons').hidden = true; $('ouvTxt').textContent = 'Nouvel essai…'; actualiserSession(); });
+  $('bOuvMdp').addEventListener('click', function(){ oublier(); afficherConnexion(); });
+
+  function afficherConnexion(){
+    ADMIN=false; CFG=null; DEPUIS=0; OPID=null; VUE=''; bandeau('');
+    $('fLogin').reset(); $('fDecl').reset(); $('declMsg').hidden = true;
+    $('list').textContent=''; $('aList').textContent=''; $('synBody').textContent='';
+    $('titre').textContent = 'Espace client';
+    $('sousTitre').textContent = 'Connectez-vous pour déclarer et suivre vos sollicitations.';
+    $('bLogout').hidden = true; $('vOuverture').hidden = true;
+    $('vApp').hidden = true; $('vLogin').hidden = false;
+    signal({hp:'pret'});
+  }
+
+  $('fLogin').addEventListener('submit', function(ev){
+    ev.preventDefault();
+    var i=$('ident').value.trim(), m=$('mdp').value;
+    if(i && m) connecter(i, m, 'form');
+  });
+  $('bLogout').addEventListener('click', function(){
+    if (JETON && !DURABLE && !DEMO) appel('apiDeconnexion', [JETON], function(){}, function(){});
+    oublier(); afficherConnexion();
+  });
+
+  function onglet(nom){
+    VUE = nom;
+    $('tAdmin').setAttribute('aria-pressed', String(nom==='admin'));
+    $('tDecl').setAttribute('aria-pressed', String(nom==='decl'));
+    $('tSuivi').setAttribute('aria-pressed', String(nom==='suivi'));
+    $('tSynth').setAttribute('aria-pressed', String(nom==='synth'));
+    $('vAdmin').hidden = nom!=='admin'; $('vDecl').hidden = nom!=='decl'; $('vSuivi').hidden = nom!=='suivi'; $('vSynth').hidden = nom!=='synth';
+    if (nom==='suivi') charger();
+    if (nom==='synth') chargerSynthese();
+    if (nom==='admin') chargerAdmin();
+  }
+  $('tAdmin').addEventListener('click', function(){ onglet('admin'); });
+  $('tDecl').addEventListener('click', function(){ onglet('decl'); });
+  $('tSuivi').addEventListener('click', function(){ onglet('suivi'); });
+  $('tSynth').addEventListener('click', function(){ onglet('synth'); });
+  $('bRefresh').addEventListener('click', charger);
+  $('bARefresh').addEventListener('click', chargerAdmin);
+
+  $('fDecl').addEventListener('submit', function(ev){
+    ev.preventDefault();
+    var f = ev.target, msg = $('declMsg');
+    var d = { client: ADMIN ? f.client.value : '', nom:f.nom.value, contact:f.contact.value, site:f.site.value, categorie:f.categorie.value,
+              urgence:(f.querySelector('input[name="urgence"]:checked')||{}).value||'Normale',
+              details:f.details.value };
+    if(ADMIN && !d.client){ show(msg,'Choisissez le client concerné.','err'); return; }
+    if(!d.nom.trim()||!d.contact.trim()||!d.site.trim()||!d.details.trim()){ show(msg,'Renseignez la personne sur place, son contact, le chantier et les détails.','err'); return; }
+    if (!OPID) OPID = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    $('bDecl').disabled = true; $('bDecl').textContent = 'Envoi en cours…';
+    api('apiDeclarer', [JETON, d, OPID], function(num){
+      OPID = null;
+      show(msg, 'Sollicitation N° '+pad(num)+' enregistrée.'+(ADMIN?'':' HydroPlomb vous recontacte rapidement.'), 'ok');
+      f.reset();
+      $('bDecl').disabled = false; $('bDecl').textContent = 'Envoyer la sollicitation';
+      window.scrollTo(0,0);
+    }, function(e){
+      var refus = texteErr(e).indexOf('REFUS: ') >= 0;
+      show(msg, refus ? errText(e) : errText(e) + ' Votre saisie est conservée : touchez de nouveau « Envoyer », la sollicitation ne sera pas enregistrée deux fois.', 'err');
+      $('bDecl').disabled = false; $('bDecl').textContent = 'Envoyer la sollicitation';
+      window.scrollTo(0,0);
+    }, function(n){ $('bDecl').textContent = 'Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…'; });
+  });
+  // Une saisie modifiée est un nouvel envoi
+  $('fDecl').addEventListener('input', function(){ OPID = null; });
+  $('fDecl').addEventListener('change', function(){ OPID = null; });
+
+  /* ---------- Carte d'une sollicitation (commune) ---------- */
+  var PAYCL={'Non payé':'b-pay0','Acompte versé':'b-pay1','Soldé':'b-pay2'};
+  function carte(it, avecClient){
+    var box=el('div','item');
+    var top=el('div','top'); top.appendChild(el('span','no','N° '+pad(it.numero))); top.appendChild(el('span','d',it.date)); box.appendChild(top);
+    if(it.declarant) box.appendChild(el('div','meta','Déclarée par '+it.declarant));
+    if(avecClient && it.client) box.appendChild(el('div','cli',it.client));
+    box.appendChild(el('div','need',[it.site,it.categorie].filter(Boolean).join(' – ')));
+    if(it.details) box.appendChild(el('div','det',it.details));
+    if(it.nom||it.contact){
+      var meta=el('div','meta','Sur place : '+(it.nom||''));
+      if(it.contact){
+        meta.appendChild(document.createTextNode(', '));
+        if(ADMIN){
+          var a=el('a',null,it.contact); a.href=telHref(it.contact); meta.appendChild(a);
+          meta.appendChild(document.createTextNode(' · '));
+          var w=el('a',null,'WhatsApp'); w.href=waHref(it.contact); w.target='_blank'; w.rel='noopener'; meta.appendChild(w);
+        } else meta.appendChild(document.createTextNode(it.contact));
+      }
+      box.appendChild(meta);
+    }
+    var b=el('div','badges');
+    b.appendChild(el('span','badge b-'+it.statut.replace(' ','-'), it.statut));
+    if(it.urgence==='Urgente') b.appendChild(el('span','badge b-urg','Urgente'));
+    if(it.facturation) b.appendChild(el('span', it.facturation==='Facturable'?'badge b-fact':'badge b-nonfact', it.facturation));
+    if(it.facturation==='Facturable' && PAYCL[it.paiement]) b.appendChild(el('span','badge '+PAYCL[it.paiement], it.paiement));
+    box.appendChild(b);
+    var extra=[];
+    if(it.dateFin) extra.push('Terminée le '+it.dateFin);
+    if(it.total) extra.push('Coût des travaux : '+money(it.total));
+    if(it.facturation==='Facturable' && it.paiement==='Acompte versé') extra.push('Acompte versé : '+money(nb(it.verse))+(it.total?', reste à payer : '+money(Math.max(0,it.total-nb(it.verse))):''));
+    if(it.observations) extra.push(it.observations);
+    if(extra.length) box.appendChild(el('div','obs',extra.join(' — ')));
+    return box;
+  }
+
+  function rendreSuivi(r){
+    var list=$('list');
+    $('duMois').textContent = r.duMois;
+    list.textContent='';
+    if(!r.items.length){ list.appendChild(el('p','empty','Aucune sollicitation pour le moment.')); return; }
+    r.items.forEach(function(it){ list.appendChild(carte(it,false)); });
+  }
+  function charger(){
+    var list=$('list'), garde = ETAT && ETAT.suivi;
+    if (garde) { rendreSuivi(garde); bandeau('Dernières données : ' + quand(ETAT.suiviLe) + '. Mise à jour en cours…'); }
+    else { list.textContent=''; list.appendChild(el('p','empty','Chargement…')); }
+    api('apiSuivi', [JETON], function(r){
+      if (VUE!=='suivi') return;
+      if (ETAT) { ETAT.suivi = r; ETAT.suiviLe = Date.now(); garder(); }
+      rendreSuivi(r); bandeau('');
+    }, function(e){
+      if (VUE!=='suivi' || !JETON) return;
+      if (garde) bandeau(errText(e) + ' Dernières données : ' + quand(ETAT.suiviLe) + '.', charger);
+      else erreurBloc(list, e, charger);
+    }, function(n){
+      if (garde) bandeau('Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…');
+      else { list.textContent=''; list.appendChild(el('p','empty','Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…')); }
+    });
+  }
+
+  /* ---------- Espace administrateur ---------- */
+  function appliquerAdmin(r){
+    ADATA = r;
+    $('sNew').textContent=r.stats.aTraiter; $('sProg').textContent=r.stats.enCours; $('sMois').textContent=r.stats.duMois;
+    var cur=AF.client; fillSelect($('fClient'), r.clients, 'Tous les clients'); $('fClient').value=cur;
+    rendreAdmin();
+  }
+  function chargerAdmin(){
+    var list=$('aList'), garde = ETAT && ETAT.admin;
+    if (garde) { if (OUVERT===null) appliquerAdmin(garde); bandeau('Dernières données : ' + quand(ETAT.adminLe) + '. Mise à jour en cours…'); }
+    else { list.textContent=''; list.appendChild(el('p','empty','Chargement…')); }
+    api('apiAdminListe', [JETON], function(r){
+      if (VUE!=='admin') return;
+      if (ETAT) { ETAT.admin = r; ETAT.adminLe = Date.now(); garder(); }
+      bandeau('');
+      if (OUVERT===null) appliquerAdmin(r); else ADATA = r;   // une fiche en cours de modification n'est pas refermée
+    }, function(e){
+      if (VUE!=='admin' || !JETON) return;
+      if (garde) bandeau(errText(e) + ' Dernières données : ' + quand(ETAT.adminLe) + '.', chargerAdmin);
+      else erreurBloc(list, e, chargerAdmin);
+    }, function(n){
+      if (garde) bandeau('Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…');
+      else { list.textContent=''; list.appendChild(el('p','empty','Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…')); }
+    });
+  }
+
+  function rendreChips(){
+    var box=$('fStatut'); box.textContent='';
+    ['Toutes','Nouvelle','En cours','Terminée'].forEach(function(k){
+      var lab = k==='Toutes'?'Toutes':(k==='Nouvelle'?'Nouvelles':(k==='Terminée'?'Terminées':'En cours'));
+      var c=el('button','chip',lab); c.type='button'; c.setAttribute('aria-pressed', String(AF.statut===k));
+      c.addEventListener('click', function(){ AF.statut=k; rendreAdmin(); });
+      box.appendChild(c);
+    });
+  }
+
+  function rendreAdmin(){
+    rendreChips();
+    var list=$('aList'); list.textContent='';
+    var q=AF.q.trim().toLowerCase();
+    var items=ADATA.items.filter(function(it){
+      if(AF.statut!=='Toutes' && it.statut!==AF.statut) return false;
+      if(AF.client && it.client!==AF.client) return false;
+      if(q && [it.site,it.details,it.nom,it.contact,it.categorie,it.observations,it.paiement].join(' ').toLowerCase().indexOf(q)<0) return false;
+      return true;
+    });
+    if(!items.length){ list.appendChild(el('p','empty', ADATA.items.length?'Aucune sollicitation ne correspond à ces filtres.':'Aucune sollicitation pour le moment.')); return; }
+    items.forEach(function(it){
+      var box=carte(it,true);
+      var tg=el('button','link',OUVERT===it.numero?'Fermer':'Mettre à jour le traitement'); tg.type='button';
+      tg.addEventListener('click', function(){ OUVERT = OUVERT===it.numero ? null : it.numero; rendreAdmin(); });
+      box.appendChild(tg);
+      if(OUVERT===it.numero) box.appendChild(formEdition(it));
+      list.appendChild(box);
+    });
+  }
+
+  function champ(label, input){ var l=el('label',null,label); l.appendChild(input); return l; }
+  function formEdition(it){
+    var f=el('form','edit');
+    var st=el('select'); ['Nouvelle','En cours','Terminée'].forEach(function(s){ var o=el('option',null,s); o.value=s; st.appendChild(o); }); st.value=it.statut;
+    var fin=el('input'); fin.type='date'; fin.value=it.dateFinIso||'';
+    var mk=function(v){ var i=el('input'); i.type='number'; i.min='0'; i.step='500'; i.inputMode='numeric'; i.value=(v===''||v==null)?'':v; return i; };
+    var mat=mk(it.materiel), mo=mk(it.mainOeuvre), aut=mk(it.autres);
+    var obs=el('textarea'); obs.maxLength=2000; obs.value=it.observations||''; obs.placeholder='Travaux réalisés, pièces changées, recommandations…';
+    var tot=el('p','tot');
+    var maj=function(){ tot.textContent='Total des travaux : '+money(nb(mat.value)+nb(mo.value)+nb(aut.value)); };
+    [mat,mo,aut].forEach(function(i){ i.addEventListener('input',maj); }); maj();
+    st.addEventListener('change', function(){ if(st.value==='Terminée' && !fin.value) fin.value=now2iso(); });
+    var g2=el('div','grid2'); g2.appendChild(champ('Statut',st)); g2.appendChild(champ('Date de fin',fin)); f.appendChild(g2);
+    var g3=el('div','grid3'); g3.appendChild(champ('Matériel (FCFA)',mat)); g3.appendChild(champ("Main-d'œuvre (FCFA)",mo)); g3.appendChild(champ('Autres frais (FCFA)',aut)); f.appendChild(g3);
+    f.appendChild(tot);
+    var fs=el('fieldset'); fs.appendChild(el('legend',null,'Facturation'));
+    var ch=el('div','choices'), nomR='fact'+it.numero;
+    ['Facturable','Non facturable'].forEach(function(v){ var l=el('label'), r=el('input'); r.type='radio'; r.name=nomR; r.value=v; r.checked=(it.facturation===v); l.appendChild(r); l.appendChild(document.createTextNode(' '+v)); ch.appendChild(l); });
+    fs.appendChild(ch); f.appendChild(fs);
+    var pb=el('fieldset','payblock'); pb.appendChild(el('legend',null,'Paiement'));
+    var pc=el('div','choices'), nomP='pay'+it.numero;
+    ['Non payé','Acompte versé','Soldé'].forEach(function(v){ var l=el('label'), r=el('input'); r.type='radio'; r.name=nomP; r.value=v; r.checked=((it.paiement||'Non payé')===v); l.appendChild(r); l.appendChild(document.createTextNode(' '+v)); pc.appendChild(l); });
+    pb.appendChild(pc);
+    var ver=mk(it.verse), lv=champ('Montant déjà versé (FCFA)', ver); pb.appendChild(lv);
+    var rest=el('p','tot'); pb.appendChild(rest);
+    f.appendChild(pb);
+    var factVal=function(){ return (f.querySelector('input[name="'+nomR+'"]:checked')||{}).value||''; };
+    var payVal=function(){ return (f.querySelector('input[name="'+nomP+'"]:checked')||{}).value||'Non payé'; };
+    var majPay=function(){
+      pb.hidden = factVal()!=='Facturable';
+      lv.hidden = payVal()!=='Acompte versé';
+      var t=nb(mat.value)+nb(mo.value)+nb(aut.value);
+      if(payVal()==='Soldé') rest.textContent='Paiement soldé'+(t?' : '+money(t):'')+'.';
+      else if(payVal()==='Acompte versé') rest.textContent=t?'Reste à payer : '+money(Math.max(0,t-nb(ver.value))):'Renseignez les coûts pour calculer le reste à payer.';
+      else rest.textContent=t?'Reste à payer : '+money(t):'';
+    };
+    f.addEventListener('change', majPay); [mat,mo,aut,ver].forEach(function(i){ i.addEventListener('input',majPay); }); majPay();
+    f.appendChild(champ('Observations',obs));
+    var err=el('div','msg err'); err.hidden=true; f.appendChild(err);
+    var act=el('div','actions');
+    var ok=el('button','btn','Enregistrer'); ok.type='submit';
+    var an=el('button','btn sec','Annuler'); an.type='button'; an.addEventListener('click', function(){ OUVERT=null; rendreAdmin(); });
+    act.appendChild(an); act.appendChild(ok); f.appendChild(act);
+    f.addEventListener('submit', function(ev){
+      ev.preventDefault();
+      if(fin.value && it.dateFinIso!==fin.value && st.value!=='Terminée' && !confirm('Une date de fin est renseignée alors que le statut n\u2019est pas « Terminée ». Enregistrer quand même ?')) return;
+      ok.disabled=true; ok.textContent='Enregistrement…';
+      api('apiAdminMaj', [JETON, it.numero, { statut: st.value, dateFin: fin.value, materiel: mat.value, mainOeuvre: mo.value, autres: aut.value, observations: obs.value, facturation: factVal(), paiement: payVal(), verse: ver.value }], function(nv){
+        for(var i=0;i<ADATA.items.length;i++){ if(ADATA.items[i].numero===nv.numero){ nv.mois=ADATA.items[i].mois; ADATA.items[i]=nv; } }
+        ADATA.stats.aTraiter=ADATA.items.filter(function(x){return x.statut==='Nouvelle';}).length;
+        ADATA.stats.enCours=ADATA.items.filter(function(x){return x.statut==='En cours';}).length;
+        $('sNew').textContent=ADATA.stats.aTraiter; $('sProg').textContent=ADATA.stats.enCours;
+        if (ETAT) { ETAT.admin = ADATA; ETAT.adminLe = Date.now(); garder(); }
+        OUVERT=null; rendreAdmin();
+      }, function(e){ ok.disabled=false; ok.textContent='Enregistrer'; err.textContent=errText(e); err.hidden=false; },
+      function(n){ ok.textContent='Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…'; });
+    });
+    return f;
+  }
+
+  /* ---------- Synthèse mensuelle ---------- */
+  var SMOIS = (function(){ var n=new Date(); return n.getFullYear()+'-'+two(n.getMonth()+1); })();
+  function moisLabel(m){ var p=m.split('-'); var s=new Date(+p[0], +p[1]-1, 1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); return s.charAt(0).toUpperCase()+s.slice(1); }
+  function decaler(m,k){ var p=m.split('-'); var d=new Date(+p[0], +p[1]-1+k, 1); return d.getFullYear()+'-'+two(d.getMonth()+1); }
+  function chargerSynthese(){
+    $('mLabel').textContent = moisLabel(SMOIS);
+    var body=$('synBody'); body.textContent=''; body.appendChild(el('p','empty','Chargement…'));
+    var demande = SMOIS + '|' + (ADMIN ? $('synClient').value : '');
+    api('apiSynthese', [JETON, SMOIS, ADMIN ? $('synClient').value : ''], function(r){
+      if (VUE!=='synth' || demande !== SMOIS + '|' + (ADMIN ? $('synClient').value : '')) return;   // réponse d'une ancienne demande
+      rendreSynthese(r);
+    }, function(e){ if (VUE==='synth' && JETON) erreurBloc(body, e, chargerSynthese); },
+    function(n){ body.textContent=''; body.appendChild(el('p','empty','Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…')); });
+  }
+  function tableau(entetes, lignes, numCols){
+    var wrap=el('div','scroll'), t=el('table','tbl'), th=el('thead'), tr=el('tr');
+    entetes.forEach(function(h,i){ var c=el('th', numCols.indexOf(i)>=0?'num':null, h); c.scope='col'; tr.appendChild(c); });
+    th.appendChild(tr); t.appendChild(th);
+    var tb=el('tbody');
+    lignes.forEach(function(l){ var r=el('tr'); l.forEach(function(v,i){ r.appendChild(el('td', numCols.indexOf(i)>=0?'num':null, v)); }); tb.appendChild(r); });
+    t.appendChild(tb); wrap.appendChild(t); return wrap;
+  }
+  function joursEntre(dateTxt, finIso){
+    var p=String(dateTxt||'').split(' à ')[0].split('/'); if(p.length!==3||!finIso) return null;
+    var f=String(finIso).split('-'); if(f.length!==3) return null;
+    return Math.max(0, Math.round((Date.UTC(+f[0],+f[1]-1,+f[2]) - Date.UTC(+p[2],+p[1]-1,+p[0]))/86400000));
+  }
+  function joursTxt(n){ return n===null ? '–' : (n===0 ? 'Le jour même' : n+' j'); }
+  function moyenneTxt(v){ if(!v.length) return '–'; var m=v.reduce(function(a,b){ return a+b; },0)/v.length; return (Math.round(m*10)/10).toLocaleString('fr-FR')+' j'; }
+  function rendreSynthese(r){
+    var body=$('synBody'); body.textContent='';
+    var lib=moisLabel(r.mois).toLowerCase();
+    var items=r.items.slice().sort(function(a,b){ return a.numero-b.numero; });
+    if(!items.length){ body.appendChild(el('p','empty','Aucune sollicitation déclarée en '+lib+'.')); return; }
+    var cnt=function(f){ return items.filter(f).length; };
+    items.forEach(function(x){ x._delai = x.dateFinIso ? joursEntre(x.date, x.dateFinIso) : null; });
+    var delais=items.filter(function(x){ return x._delai!==null; }).map(function(x){ return x._delai; });
+    var tuile=function(box,val,txt){ var d=el('div','stat'); d.appendChild(el('strong',null,val)); d.appendChild(el('span',null,txt)); box.appendChild(d); };
+
+    var k1=el('div','stats stats4');
+    tuile(k1, items.length, 'Déclarées');
+    tuile(k1, cnt(function(x){ return x.statut==='Terminée'; }), 'Terminées');
+    tuile(k1, cnt(function(x){ return x.statut==='En cours'; }), 'En cours');
+    tuile(k1, cnt(function(x){ return x.statut==='Nouvelle'; }), 'À traiter');
+    body.appendChild(k1);
+    var k2=el('div','stats');
+    tuile(k2, moyenneTxt(delais), 'Délai moyen de traitement');
+    tuile(k2, delais.length ? joursTxt(Math.max.apply(null, delais)) : '–', 'Délai le plus long');
+    tuile(k2, cnt(function(x){ return x.urgence==='Urgente'; }), 'Urgentes');
+    body.appendChild(k2);
+
+    var fa=items.filter(function(x){ return x.facturation==='Facturable' && (ADMIN || x.paiement); });
+    if(fa.length){
+      var cp=function(s){ return fa.filter(function(x){ return (x.paiement||'Non payé')===s; }).length; };
+      body.appendChild(el('p','note',(fa.length>1?'Paiements des '+fa.length+' sollicitations facturables':'Paiement de la sollicitation facturable')+' : '+cp('Soldé')+' soldée(s), '+cp('Acompte versé')+' avec acompte, '+cp('Non payé')+' non payée(s).'));
+    }
+
+    body.appendChild(el('h3','sh','Anomalies déclarées : '+items.length+' au total'));
+    var cats={}; items.forEach(function(x){ var k=x.categorie||'Autre'; cats[k]=(cats[k]||0)+1; });
+    var cles=Object.keys(cats).sort(function(a,b){ return cats[b]-cats[a] || a.localeCompare(b); });
+    var max=cats[cles[0]];
+    var g=el('div','bars'); g.setAttribute('role','list');
+    cles.forEach(function(k){
+      var row=el('div','bar-row'); row.setAttribute('role','listitem');
+      row.appendChild(el('span','bar-lab',k));
+      var tr=el('span','bar-track'), f=el('span','bar-fill'); f.style.width=Math.max(4, Math.round(cats[k]/max*100))+'%'; tr.appendChild(f); row.appendChild(tr);
+      row.appendChild(el('span','bar-val',String(cats[k])));
+      g.appendChild(row);
+    });
+    body.appendChild(g);
+
+    body.appendChild(el('h3','sh','Déclarations par personne'));
+    var pers={}; items.forEach(function(x){ var k=(x.declarant||'Non renseigné')+(ADMIN && !$('synClient').value && x.client ? ' ('+x.client+')' : ''); pers[k]=(pers[k]||0)+1; });
+    var pk=Object.keys(pers).sort(function(a,b){ return pers[b]-pers[a] || a.localeCompare(b); }), pm=pers[pk[0]], pg=el('div','bars'); pg.setAttribute('role','list');
+    pk.forEach(function(k){
+      var row=el('div','bar-row'); row.setAttribute('role','listitem');
+      row.appendChild(el('span','bar-lab',k));
+      var tr=el('span','bar-track'), f=el('span','bar-fill alt'); f.style.width=Math.max(4, Math.round(pers[k]/pm*100))+'%'; tr.appendChild(f); row.appendChild(tr);
+      row.appendChild(el('span','bar-val',String(pers[k])));
+      pg.appendChild(row);
+    });
+    body.appendChild(pg);
+
+    body.appendChild(el('h3','sh','Détail des sollicitations'));
+    var tous = ADMIN && !$('synClient').value;
+    var auj = now2iso();
+    var ent = ['N°','Déclarée le','Déclarée par'].concat(tous?['Client']:[]).concat(['Site','Catégorie','Statut','Terminée le','Délai','Facturation','Paiement']);
+    body.appendChild(tableau(ent, items.map(function(x){
+      var delai = x._delai!==null ? joursTxt(x._delai) : 'Ouverte depuis '+joursTxt(joursEntre(x.date, auj));
+      return [pad(x.numero), (x.date||'').split(' à ')[0], x.declarant||'–'].concat(tous?[x.client]:[]).concat([x.site, x.categorie, x.statut, x.dateFin||'–', delai, x.facturation||'–', x.facturation==='Facturable'?(x.paiement||(ADMIN?'Non payé':'–')):'–']);
+    }), []));
+    body.appendChild(el('p','note','Toutes les sollicitations déclarées en '+lib+', avec leur état à ce jour. Le délai est compté en jours, de la déclaration à la fin du traitement.'));
+  }
+  $('mPrev').addEventListener('click', function(){ SMOIS=decaler(SMOIS,-1); chargerSynthese(); });
+  $('mNext').addEventListener('click', function(){ SMOIS=decaler(SMOIS,1); chargerSynthese(); });
+  $('synClient').addEventListener('change', chargerSynthese);
+
+  $('fClient').addEventListener('change', function(e){ AF.client=e.target.value; rendreAdmin(); });
+  $('fQ').addEventListener('input', function(e){ AF.q=e.target.value; rendreAdmin(); });
+
+  /* ---------- Démarrage ---------- */
+  if (DEMO) $('demo').hidden = false;
+  ssSet('hp_id', null); ssSet('hp_mdp', null);   // anciennes versions : le mot de passe n'est plus gardé
+  (function(){
+    var j = ssGet('hp_jeton'), g = null;
+    try { g = JSON.parse(ssGet('hp_etat') || 'null'); } catch(e) {}
+    if (j && !DEMO) reprendre(j, ssGet('hp_durable') === '1', g);
+    else signal({hp:'pret'});
+  })();
+</script>
+</body>
+</html>
