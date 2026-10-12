@@ -30,6 +30,9 @@
   .head-row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
   .client-label{margin:6px 0 0;color:#C9D8E3}
   .logout{font:inherit;font-weight:600;background:transparent;color:#fff;border:1px solid #7F9BB0;border-radius:8px;padding:8px 12px;min-height:44px;cursor:pointer;white-space:nowrap}
+  .head-btns{display:flex;flex-direction:column;align-items:stretch;gap:6px}
+  .head-btns .faceid{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--orange);color:#1A1006;border-color:var(--orange)}
+  .head-btns .faceid svg{width:18px;height:18px;flex-shrink:0}
   main{padding:0 14px 40px}
   .demo{background:var(--prog-bg);color:var(--prog-ink);border-radius:10px;padding:10px 14px;margin:14px 0 0;font-weight:600}
   .info{background:var(--new-bg);color:var(--new-ink);border-radius:10px;padding:10px 14px;margin:14px 0 0;font-weight:600;font-size:15px}
@@ -140,14 +143,17 @@
         <h1 id="titre">Espace client</h1>
         <p class="client-label" id="sousTitre">Connectez-vous pour déclarer et suivre vos sollicitations.</p>
       </div>
-      <button class="logout" type="button" id="bLogout" hidden>Se déconnecter</button>
+      <div class="head-btns">
+        <button class="logout faceid" type="button" id="bFaceID" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3M9 9v1M15 9v1M12 9v4h-1M9 16c1.5 1 4.5 1 6 0"/></svg><span id="bFaceIDTxt">Activer Face ID</span></button>
+        <button class="logout" type="button" id="bLogout" hidden>Se déconnecter</button>
+      </div>
     </div>
   </div>
 </header>
 
 <main class="wrap">
   <p class="info" id="cacheInfo" role="status" hidden></p>
-  <p class="demo" id="demo" hidden>Aperçu : rien n'est enregistré dans le registre. Tapez « admin » comme identifiant pour voir l'espace HydroPlomb, ou n'importe quel autre pour l'espace client.</p>
+  <p class="demo" id="demo" hidden>Aperçu : rien n'est enregistré dans le registre. Identifiant « admin » : espace HydroPlomb ; « responsable » : responsable d'une entreprise (voit toutes ses sollicitations) ; tout autre identifiant : simple utilisateur (ne voit que ce qu'il a déclaré).</p>
 
   <!-- Connexion -->
   <section class="card" id="vLogin" style="margin-top:16px">
@@ -219,7 +225,7 @@
 
     <section id="vSuivi" hidden>
       <div class="card" style="margin-top:0">
-        <p class="count"><strong id="duMois">0</strong>sollicitation(s) déclarée(s) ce mois-ci</p>
+        <p class="count"><strong id="duMois">0</strong><span id="duMoisTxt">sollicitation(s) déclarée(s) ce mois-ci</span></p>
         <div id="list"></div>
         <button class="link" type="button" id="bRefresh">Actualiser</button>
       </div>
@@ -247,7 +253,8 @@
   var OPID = null;      // identifiant de l'envoi en cours (pas de doublon en cas de nouvel essai)
   var ADATA = { items: [], clients: [] }, AF = { statut: 'Toutes', client: '', q: '' }, OUVERT = null;
   var DEMO = !(window.google && google.script && google.script.run);
-  var DEMO_ADMIN = false;
+  var DEMO_ADMIN = false, DEMO_RESP = false;
+  var PORTE = null;     // ce que la page d'accueil annonce : { faceid: disponible, actif: déjà activé, libelle }
   // Données fictives utilisées uniquement pour l'aperçu ; en service, tout vient du registre.
   var DEMO_CATEGORIES = ["Manque d'eau","Fuite sur compteur","Compteur cassé","Fuite ou baisse de pression","Branchement simple","Abonnement simple","Branchement et abonnement","Facture élevée","Facture non reçue","Mutation","Résiliation","Adduction","Extension","Déplacement réseau","Conception ou plans","Travaux de plomberie","Entretien","Autre"];
   var DEMO_CLIENTS = ['Entreprise exemple', 'Client de démonstration'];
@@ -345,22 +352,24 @@
   }
 
   /* ---------- Aperçu (hors Google Apps Script) : simulation avec les données fictives ---------- */
-  function demoCfg(){ return { client: DEMO_ADMIN?'HydroPlomb':'Entreprise exemple', admin: DEMO_ADMIN, utilisateur: DEMO_ADMIN?'HydroPlomb':'Utilisateur exemple', categories: DEMO_CATEGORIES, clients: DEMO_ADMIN?DEMO_CLIENTS:[] }; }
+  function demoUtil(){ return DEMO_ADMIN ? 'HydroPlomb' : (DEMO_RESP ? 'Responsable exemple' : 'Utilisateur exemple'); }
+  function demoVisibles(){ return demoItems.filter(function(x){ return x.client==='Entreprise exemple' && (DEMO_RESP || x.declarant===demoUtil()); }); }
+  function demoCfg(){ return { client: DEMO_ADMIN?'HydroPlomb':'Entreprise exemple', admin: DEMO_ADMIN, responsable: DEMO_RESP, utilisateur: demoUtil(), categories: DEMO_CATEGORIES, clients: DEMO_ADMIN?DEMO_CLIENTS:[] }; }
   function demo(name, args, ok, ko){
     setTimeout(function(){
       try {
-        if (name==='apiConnexion') { DEMO_ADMIN = String(args[0]).toLowerCase()==='admin'; var c=demoCfg(); c.jeton='demo'; return ok(c); }
+        if (name==='apiConnexion') { var id=String(args[0]).toLowerCase(); DEMO_ADMIN = id==='admin'; DEMO_RESP = id==='responsable'; var c=demoCfg(); c.jeton='demo'; return ok(c); }
         if (name==='apiReprendre') return ok(demoCfg());
         if (name==='apiDeclarer') {
           var d=args[1], now=new Date();
           var it={ numero: demoItems.length+1, date: two(now.getDate())+'/'+two(now.getMonth()+1)+'/'+now.getFullYear()+' à '+two(now.getHours())+':'+two(now.getMinutes()),
             mois: now.getFullYear()+'-'+two(now.getMonth()+1), client: DEMO_ADMIN?d.client:'Entreprise exemple', nom:d.nom, contact:d.contact, site:d.site, categorie:d.categorie, urgence:d.urgence, details:d.details,
-            statut:'Nouvelle', dateFin:'', dateFinIso:'', materiel:'', mainOeuvre:'', autres:'', total:0, observations:'', canal: DEMO_ADMIN?'Saisie HydroPlomb':'Application HydroPlomb', declarant: DEMO_ADMIN?'HydroPlomb':'Utilisateur exemple' };
+            statut:'Nouvelle', dateFin:'', dateFinIso:'', materiel:'', mainOeuvre:'', autres:'', total:0, observations:'', canal: DEMO_ADMIN?'Saisie HydroPlomb':'Application HydroPlomb', declarant: demoUtil() };
           demoItems.unshift(it); return ok(it.numero);
         }
         var moisCourant = new Date().getFullYear()+'-'+two(new Date().getMonth()+1);
-        if (name==='apiSuivi') { var mine=demoItems.filter(function(x){ return x.client==='Entreprise exemple'; }); return ok({ duMois: mine.filter(function(x){ return x.mois===moisCourant; }).length, items: mine }); }
-        if (name==='apiSynthese') { var mm=args[1], cc=DEMO_ADMIN?(args[2]||''):'Entreprise exemple'; return ok({ mois: mm, client: cc||'Tous les clients', items: demoItems.filter(function(x){ return x.mois===mm && (!cc || x.client===cc); }) }); }
+        if (name==='apiSuivi') { var mine=demoVisibles(); return ok({ duMois: mine.filter(function(x){ return x.mois===moisCourant; }).length, items: mine }); }
+        if (name==='apiSynthese') { var mm=args[1], cc=DEMO_ADMIN?(args[2]||''):'Entreprise exemple'; return ok({ mois: mm, client: cc||'Tous les clients', items: (DEMO_ADMIN ? demoItems : demoVisibles()).filter(function(x){ return x.mois===mm && (!cc || x.client===cc); }) }); }
         if (name==='apiAdminListe') return ok({ items: demoItems, clients: DEMO_CLIENTS, stats: {
           aTraiter: demoItems.filter(function(x){return x.statut==='Nouvelle';}).length,
           enCours: demoItems.filter(function(x){return x.statut==='En cours';}).length, duMois: demoItems.filter(function(x){ return x.mois===moisCourant; }).length } });
@@ -410,20 +419,32 @@
     else if (d.hp === 'identifiants' && d.ident && d.mdp && !JETON) connecter(String(d.ident), String(d.mdp), 'ancien');
     else if (d.hp === 'faceid-active' && JETON && !DURABLE) rendreDurable();
     else if (d.hp === 'oublier' && d.jeton && !DEMO) appel('apiDeconnexion', [String(d.jeton)], function(){}, function(){});
+    else if (d.hp === 'porte') { PORTE = { faceid: !!d.faceid, actif: !!d.actif, libelle: String(d.libelle || 'Face ID').slice(0, 40) }; majFaceID(); }
   });
+
+  /* Bouton « Activer Face ID » : visible une fois connecté, si le téléphone le permet et que ce n'est pas déjà fait.
+     L'activation elle-même se fait dans la fenêtre de la page d'accueil (le téléphone l'exige). */
+  function majFaceID(){
+    var b = $('bFaceID');
+    b.hidden = !(PORTE && PORTE.faceid && !PORTE.actif && JETON && CFG && !DEMO);
+    if (PORTE) $('bFaceIDTxt').textContent = 'Activer ' + PORTE.libelle;
+  }
+  $('bFaceID').addEventListener('click', function(){ signal({hp:'activer-faceid', ident: (CFG && CFG.ident) || ''}); });
 
   /* Met la configuration à l'écran (premier : choisit l'onglet de départ) */
   function entrer(cfg, premier){
     CFG = cfg; ADMIN = !!cfg.admin;
     fillSelect($('cat'), cfg.categories);
     $('titre').textContent = ADMIN ? 'Espace HydroPlomb' : cfg.client;
-    $('sousTitre').textContent = (ADMIN ? 'Administration HydroPlomb – ' : '') + 'Connecté : ' + (cfg.utilisateur || cfg.client);
+    $('sousTitre').textContent = (ADMIN ? 'Administration HydroPlomb – ' : '') + 'Connecté : ' + (cfg.utilisateur || cfg.client) + (cfg.responsable ? ' (responsable)' : '');
+    $('duMoisTxt').textContent = cfg.responsable ? 'sollicitation(s) de l\u2019entreprise ce mois-ci' : 'sollicitation(s) déclarée(s) par vous ce mois-ci';
     $('bLogout').hidden = false;
     $('lClient').hidden = !ADMIN;
     $('tAdmin').hidden = !ADMIN; $('tSuivi').hidden = ADMIN;
     if (ADMIN) { fillSelect($('selClient'), cfg.clients || [], 'Choisir le client'); fillSelect($('fClient'), cfg.clients || [], 'Tous les clients'); }
     fillSelect($('synClient'), ADMIN ? (cfg.clients || []) : [], 'Tous les clients'); $('lSynClient').hidden = !ADMIN;
     $('vLogin').hidden = true; $('vOuverture').hidden = true; $('vApp').hidden = false;
+    majFaceID();
     if (premier || (VUE==='admin' && !ADMIN) || (VUE==='suivi' && ADMIN)) onglet(ADMIN ? 'admin' : 'decl');   // rôle changé depuis la dernière ouverture
   }
 
@@ -495,6 +516,7 @@
     $('sousTitre').textContent = 'Connectez-vous pour déclarer et suivre vos sollicitations.';
     $('bLogout').hidden = true; $('vOuverture').hidden = true;
     $('vApp').hidden = true; $('vLogin').hidden = false;
+    majFaceID();
     signal({hp:'pret'});
   }
 
@@ -802,6 +824,7 @@
     });
     body.appendChild(g);
 
+    if (ADMIN || (CFG && CFG.responsable)) {   // un simple utilisateur ne voit que ses propres déclarations
     body.appendChild(el('h3','sh','Déclarations par personne'));
     var pers={}; items.forEach(function(x){ var k=(x.declarant||'Non renseigné')+(ADMIN && !$('synClient').value && x.client ? ' ('+x.client+')' : ''); pers[k]=(pers[k]||0)+1; });
     var pk=Object.keys(pers).sort(function(a,b){ return pers[b]-pers[a] || a.localeCompare(b); }), pm=pers[pk[0]], pg=el('div','bars'); pg.setAttribute('role','list');
@@ -813,6 +836,7 @@
       pg.appendChild(row);
     });
     body.appendChild(pg);
+    }
 
     body.appendChild(el('h3','sh','Détail des sollicitations'));
     var tous = ADMIN && !$('synClient').value;
