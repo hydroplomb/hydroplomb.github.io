@@ -20,8 +20,14 @@
   body { position: fixed; inset: 0; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
   /* Sur iPhone, un cadre s'élargit à la taille de son contenu : 1px + min-width 100 % le garde à la largeur de l'écran */
   iframe { position: relative; z-index: 1; display: block; width: 1px; min-width: 100%; max-width: 100%; height: 100%; border: 0; background: transparent; }
-  #attente { position: fixed; inset: 0; z-index: 0; display: grid; place-content: center; justify-items: center; gap: 14px; font-weight: 600; font-size: 16px; color: #0A3550; }
+  #attente { position: fixed; inset: 0; z-index: 0; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px; font-weight: 600; font-size: 16px; color: #0A3550; text-align: center; }
   #attente img { width: 96px; height: 96px; border-radius: 22px; }
+  #attenteEtat { max-width: 300px; font-weight: 400; font-size: 15px; line-height: 1.45; color: #4F5F6B; min-height: 22px; }
+  /* Panne : l'écran d'attente passe devant le cadre pour que « Réessayer » soit utilisable */
+  #attente.panne { z-index: 3; background: #F2F5F7; }
+  #attente.panne #attenteEtat { color: #8E1B1B; font-weight: 600; }
+  #attenteReessayer { font: inherit; font-weight: 700; min-height: 48px; padding: 12px 28px; border: none; border-radius: 10px; background: #E8843A; color: #1A1006; cursor: pointer; }
+  #attenteReessayer[hidden] { display: none; }
   /* Fenêtre Face ID */
   #fid { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center; padding: 20px; padding-top: calc(20px + env(safe-area-inset-top, 0px)); background: rgba(242, 245, 247, 0.97); }
   #fid[hidden] { display: none; }
@@ -38,9 +44,15 @@
 </style>
 </head>
 <body>
-<div id="attente"><img src="icone-192.png" alt="">Ouverture de HydroPlomb…</div>
-<!-- L'application elle-même (Google Apps Script). Cette page lui donne un nom, une icône et la connexion par Face ID. -->
-<iframe src="https://script.google.com/macros/s/AKfycbzegRkLxSnDUaqEdPZiiCcTpi02KFYlTcwSp8TCINjlLdmRhSZP2iToUdvBG0mi8lbJ/exec"
+<div id="attente">
+  <img src="icone-192.png" alt="">
+  <span id="attenteTitre">Ouverture de HydroPlomb…</span>
+  <span id="attenteEtat" role="status"></span>
+  <button id="attenteReessayer" type="button" hidden>Réessayer</button>
+</div>
+<!-- L'application elle-même (Google Apps Script). Cette page lui donne un nom, une icône, la connexion par Face ID,
+     et surveille son ouverture : sur le réseau mobile, une connexion à Google reste parfois bloquée. -->
+<iframe id="app" src="https://script.google.com/macros/s/AKfycbzegRkLxSnDUaqEdPZiiCcTpi02KFYlTcwSp8TCINjlLdmRhSZP2iToUdvBG0mi8lbJ/exec"
         title="HydroPlomb" allow="clipboard-write"></iframe>
 
 <div id="fid" hidden role="dialog" aria-modal="true" aria-labelledby="fidTitre">
@@ -53,38 +65,46 @@
       <span id="fidOkTexte"></span>
     </button>
     <button id="fidNon" class="lien" type="button"></button>
-    <button id="fidOff" class="lien petit" type="button" hidden>Désactiver Face ID sur cet iPhone</button>
+    <button id="fidOff" class="lien petit" type="button" hidden></button>
     <p id="fidErr" class="err" role="alert" hidden></p>
   </div>
 </div>
 
 <script>
-/* Connexion par Face ID : la clé d'accès (passkey) est créée sur l'iPhone pour hydroplomb.github.io.
-   Face ID valide l'accès, puis cette page transmet les identifiants enregistrés à l'application. */
+/* Connexion par Face ID : la clé d'accès (passkey) est créée sur le téléphone pour hydroplomb.github.io.
+   Face ID déverrouille un jeton de connexion gardé ici (jamais le mot de passe), que cette page transmet
+   à l'application. Le jeton est annulé si le mot de passe du compte est changé dans le registre. */
 (function () {
-  var CLE = 'hp_faceid', REFUS = 'hp_faceid_refus';
+  var FID = 'hp_faceid', ETAT = 'hp_etat', REFUS = 'hp_faceid_refus';
+  var APP = /^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/;   // origine du cadre de l'application
   var $ = function (id) { return document.getElementById(id); };
   var fid = $('fid'), texte = $('fidTexte'), ok = $('fidOk'), okTexte = $('fidOkTexte'), non = $('fidNon'), off = $('fidOff'), err = $('fidErr');
-  var app = null, origineApp = null, aEnvoyer = null, mode = null, aActiver = null;
+  var app = null, origineApp = null, mode = null, aActiver = null, enAttente = null;
+  var ua = navigator.userAgent;
+  var ios = /iP(hone|ad|od)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var LIB = ios ? 'Face ID' : /Mac/.test(navigator.platform) ? 'Touch ID' : /Android/i.test(ua) ? 'l’empreinte' : /Windows/i.test(ua) ? 'Windows Hello' : 'l’empreinte ou le visage';
+  var APPAREIL = ios ? (/iPad/.test(ua) ? 'cet iPad' : 'cet iPhone') : 'cet appareil';
 
-  function lire() { try { return JSON.parse(localStorage.getItem(CLE) || 'null'); } catch (e) { return null; } }
-  function ecrire(v) { try { if (v) localStorage.setItem(CLE, JSON.stringify(v)); else localStorage.removeItem(CLE); } catch (e) {} }
+  function lire(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function ecrire(k, v) { try { if (v) localStorage.setItem(k, JSON.stringify(v)); else localStorage.removeItem(k); } catch (e) {} }
   function versB64(buf) { var s = String.fromCharCode.apply(null, new Uint8Array(buf)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
   function depuisB64(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
   function alea(n) { var u = new Uint8Array(n); crypto.getRandomValues(u); return u; }
   function disponible() { return !!(window.PublicKeyCredential && navigator.credentials && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable); }
+  function envoyer(m) { if (app) app.postMessage(m, origineApp); }
 
   function montrer(m) {
     mode = m; err.hidden = true; ok.disabled = false;
-    var s = lire();
+    var s = lire(FID);
     if (m === 'deverrouiller') {
-      texte.textContent = 'Connectez-vous en un regard' + (s ? ' (compte ' + s.ident + ')' : '') + '.';
-      okTexte.textContent = 'Se connecter avec Face ID';
+      texte.textContent = 'Connectez-vous en un regard' + (s && s.ident ? ' (compte ' + s.ident + ')' : '') + '.';
+      okTexte.textContent = 'Se connecter avec ' + LIB;
       non.textContent = 'Utiliser identifiant et mot de passe';
+      off.textContent = 'Désactiver ' + LIB + ' sur ' + APPAREIL;
       off.hidden = false;
     } else {
-      texte.textContent = 'Activer Face ID sur cet iPhone ? Vous n\u2019aurez plus à saisir votre identifiant ni votre mot de passe.';
-      okTexte.textContent = 'Activer Face ID';
+      texte.textContent = 'Activer ' + LIB + ' sur ' + APPAREIL + ' ? Vous n’aurez plus à saisir votre identifiant ni votre mot de passe.';
+      okTexte.textContent = 'Activer ' + LIB;
       non.textContent = 'Plus tard';
       off.hidden = true;
     }
@@ -92,17 +112,18 @@
     ok.focus();
   }
   function cacher() { fid.hidden = true; mode = null; }
-  function envoyer() {
-    if (aEnvoyer && app) { app.postMessage({ hp: 'identifiants', ident: aEnvoyer.ident, mdp: aEnvoyer.mdp }, origineApp); aEnvoyer = null; }
-  }
 
   ok.addEventListener('click', function () {
     ok.disabled = true; err.hidden = true;
     if (mode === 'deverrouiller') {
-      var s = lire(); if (!s) { cacher(); return; }
+      var s = lire(FID); if (!s) { cacher(); return; }
       navigator.credentials.get({ publicKey: { challenge: alea(32), allowCredentials: [{ type: 'public-key', id: depuisB64(s.id) }], userVerification: 'required', timeout: 60000 } })
-        .then(function () { aEnvoyer = { ident: s.ident, mdp: s.mdp }; cacher(); envoyer(); })
-        .catch(function () { ok.disabled = false; err.textContent = 'Face ID n\u2019a pas abouti. Réessayez, ou utilisez votre mot de passe.'; err.hidden = false; });
+        .then(function () {
+          cacher();
+          if (s.jeton) { var g = lire(ETAT); envoyer({ hp: 'jeton', jeton: s.jeton, etat: g && g.j === s.jeton ? g : null }); }
+          else if (s.mdp) envoyer({ hp: 'identifiants', ident: s.ident, mdp: s.mdp });   // ancien enregistrement : remplacé par un jeton
+        })
+        .catch(function () { ok.disabled = false; err.textContent = LIB + ' n’a pas abouti. Réessayez, ou utilisez votre mot de passe.'; err.hidden = false; });
     } else if (mode === 'activer' && aActiver) {
       navigator.credentials.create({ publicKey: {
           rp: { name: 'HydroPlomb' },
@@ -111,36 +132,87 @@
           pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
           authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
           attestation: 'none', timeout: 60000 } })
-        .then(function (c) { ecrire({ id: versB64(c.rawId), ident: aActiver.ident, mdp: aActiver.mdp }); aActiver = null; cacher(); })
-        .catch(function () { ok.disabled = false; err.textContent = 'L\u2019activation n\u2019a pas abouti. Vous pourrez réessayer à la prochaine connexion.'; err.hidden = false; });
+        .then(function (c) {
+          // La clé est créée : l'application demande au serveur un jeton durable, que cette page gardera.
+          enAttente = { id: versB64(c.rawId), ident: aActiver.ident }; aActiver = null; cacher();
+          envoyer({ hp: 'faceid-active' });
+        })
+        .catch(function () { ok.disabled = false; err.textContent = 'L’activation n’a pas abouti. Vous pourrez réessayer à la prochaine connexion.'; err.hidden = false; });
     }
   });
   non.addEventListener('click', function () {
     if (mode === 'activer' && aActiver) { try { sessionStorage.setItem(REFUS, aActiver.ident); } catch (e) {} aActiver = null; }
     cacher();
   });
-  off.addEventListener('click', function () { ecrire(null); cacher(); });
+  off.addEventListener('click', function () {
+    var s = lire(FID);
+    if (s && s.jeton) envoyer({ hp: 'oublier', jeton: s.jeton });   // le serveur annule le jeton
+    ecrire(FID, null); ecrire(ETAT, null); cacher();
+  });
 
-  // Messages de l'application (Google Apps Script)
+  /* Messages de l'application (Google Apps Script) */
   window.addEventListener('message', function (e) {
-    if (!/^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(e.origin)) return;
+    if (!APP.test(e.origin)) return;
     var d = e.data || {};
+    if (typeof d.hp !== 'string') return;
     app = e.source; origineApp = e.origin;
+    vivant();
     if (d.hp === 'pret') {
-      if (lire() && disponible()) montrer('deverrouiller'); else cacher();
-      envoyer();
-    } else if (d.hp === 'connecte' && d.ident && d.mdp) {
-      var s = lire();
-      if (s) { if (s.ident === d.ident && s.mdp !== d.mdp) { s.mdp = String(d.mdp); ecrire(s); } return; }
+      if (lire(FID) && disponible()) montrer('deverrouiller'); else cacher();
+    } else if (d.hp === 'connecte' && d.ident) {
+      if (lire(FID) || !disponible()) return;
       var refus = ''; try { refus = sessionStorage.getItem(REFUS) || ''; } catch (x) {}
-      if (refus === d.ident || !disponible()) return;
+      if (refus === d.ident) return;
       PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (oui) {
-        if (oui) { aActiver = { ident: String(d.ident), mdp: String(d.mdp) }; montrer('activer'); }
+        if (oui) { aActiver = { ident: String(d.ident) }; montrer('activer'); }
       });
+    } else if (d.hp === 'jeton-durable' && typeof d.jeton === 'string' && d.jeton) {
+      if (enAttente) { ecrire(FID, { id: enAttente.id, ident: enAttente.ident, jeton: d.jeton }); enAttente = null; }
+      else { var s = lire(FID); if (s && !s.jeton) { delete s.mdp; s.jeton = d.jeton; ecrire(FID, s); } }
+    } else if (d.hp === 'faceid-impossible') {
+      enAttente = null;
+    } else if (d.hp === 'etat') {
+      var f = lire(FID);
+      if (f && f.jeton && d.g && d.g.j === f.jeton) { try { localStorage.setItem(ETAT, JSON.stringify(d.g)); } catch (x) {} }
     } else if (d.hp === 'echec') {
-      ecrire(null);
+      ecrire(FID, null); ecrire(ETAT, null);
     }
   });
+
+  /* L'application a peut-être dit bonjour avant que cette page écoute : on se présente aux cadres dès leur chargement. */
+  function saluer(w, n) { try { for (var k = 0; k < w.frames.length; k++) { w.frames[k].postMessage({ hp: 'porte-prete' }, '*'); if (n < 3) saluer(w.frames[k], n + 1); } } catch (e) {} }
+  $('app').addEventListener('load', function () {
+    setTimeout(function () { saluer($('app').contentWindow, 0); }, 400);
+    setTimeout(function () { if (!app) saluer($('app').contentWindow, 0); }, 2500);
+  });
+
+  /* Surveillance de l'ouverture : si l'application ne s'est pas annoncée à temps,
+     la page la recharge (deux fois : après 15 s, puis 20 s), puis propose « Réessayer ». */
+  var SRC = $('app').getAttribute('src'), essai = 1, minuteur = null, lent = null;
+  function vivant() {
+    clearTimeout(minuteur); clearTimeout(lent);
+    $('attente').className = ''; $('attenteTitre').textContent = 'Ouverture de HydroPlomb…'; $('attenteEtat').textContent = ''; $('attenteReessayer').hidden = true;
+  }
+  function surveiller() {
+    clearTimeout(minuteur); clearTimeout(lent);
+    lent = setTimeout(function () { if (!app) $('attenteEtat').textContent = 'Connexion lente, merci de patienter…'; }, 6000);
+    minuteur = setTimeout(function () {
+      if (app) return;
+      if (essai < 3) { essai++; $('attenteEtat').textContent = 'Nouvel essai de connexion (' + essai + ' sur 3)…'; recharger(); }
+      else {
+        $('attente').className = 'panne';
+        $('attenteTitre').textContent = 'HydroPlomb ne répond pas';
+        $('attenteEtat').textContent = 'Vérifiez votre connexion (Wi-Fi ou données mobiles), puis réessayez.';
+        $('attenteReessayer').hidden = false; $('attenteReessayer').focus();
+      }
+    }, essai === 1 ? 15000 : 20000);
+  }
+  function recharger() { $('app').setAttribute('src', SRC + (SRC.indexOf('?') < 0 ? '?' : '&') + 'essai=' + essai + '-' + Date.now()); surveiller(); }
+  $('attenteReessayer').addEventListener('click', function () {
+    essai = 1; $('attente').className = ''; $('attenteReessayer').hidden = true; $('attenteTitre').textContent = 'Ouverture de HydroPlomb…';
+    $('attenteEtat').textContent = 'Nouvel essai de connexion…'; recharger();
+  });
+  surveiller();
 })();
 </script>
 </body>
