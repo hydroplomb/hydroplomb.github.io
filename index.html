@@ -92,6 +92,10 @@
   function alea(n) { var u = new Uint8Array(n); crypto.getRandomValues(u); return u; }
   function disponible() { return !!(window.PublicKeyCredential && navigator.credentials && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable); }
   function envoyer(m) { if (app) app.postMessage(m, origineApp); }
+  /* Dit à l'application si Face ID est possible sur ce téléphone et s'il est déjà activé (bouton « Activer Face ID ») */
+  var uvpaa = false;
+  if (disponible()) PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (oui) { uvpaa = !!oui; annoncer(); }, function () {});
+  function annoncer() { var f = lire(FID); envoyer({ hp: 'porte', faceid: uvpaa, actif: !!(f && f.jeton), libelle: LIB }); }
 
   function montrer(m) {
     mode = m; err.hidden = true; ok.disabled = false;
@@ -147,7 +151,7 @@
   off.addEventListener('click', function () {
     var s = lire(FID);
     if (s && s.jeton) envoyer({ hp: 'oublier', jeton: s.jeton });   // le serveur annule le jeton
-    ecrire(FID, null); ecrire(ETAT, null); cacher();
+    ecrire(FID, null); ecrire(ETAT, null); cacher(); annoncer();
   });
 
   /* Messages de l'application (Google Apps Script) */
@@ -155,8 +159,10 @@
     if (!APP.test(e.origin)) return;
     var d = e.data || {};
     if (typeof d.hp !== 'string') return;
+    var nouveau = !app;
     app = e.source; origineApp = e.origin;
     vivant();
+    if (nouveau || d.hp === 'bonjour') annoncer();
     if (d.hp === 'pret') {
       if (lire(FID) && disponible()) montrer('deverrouiller'); else cacher();
     } else if (d.hp === 'connecte' && d.ident) {
@@ -166,16 +172,22 @@
       PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (oui) {
         if (oui) { aActiver = { ident: String(d.ident) }; montrer('activer'); }
       });
+    } else if (d.hp === 'activer-faceid') {
+      // Demandé depuis le bouton de l'application : même fenêtre qu'après une connexion
+      if (!uvpaa) return;
+      try { sessionStorage.removeItem(REFUS); } catch (x) {}
+      aActiver = { ident: String(d.ident || 'HydroPlomb') }; montrer('activer');
     } else if (d.hp === 'jeton-durable' && typeof d.jeton === 'string' && d.jeton) {
       if (enAttente) { ecrire(FID, { id: enAttente.id, ident: enAttente.ident, jeton: d.jeton }); enAttente = null; }
       else { var s = lire(FID); if (s && !s.jeton) { delete s.mdp; s.jeton = d.jeton; ecrire(FID, s); } }
+      annoncer();
     } else if (d.hp === 'faceid-impossible') {
       enAttente = null;
     } else if (d.hp === 'etat') {
       var f = lire(FID);
       if (f && f.jeton && d.g && d.g.j === f.jeton) { try { localStorage.setItem(ETAT, JSON.stringify(d.g)); } catch (x) {} }
     } else if (d.hp === 'echec') {
-      ecrire(FID, null); ecrire(ETAT, null);
+      ecrire(FID, null); ecrire(ETAT, null); annoncer();
     }
   });
 
