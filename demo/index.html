@@ -74,6 +74,14 @@
   .b-En-cours{background:var(--prog-bg);color:var(--prog-ink)}
   .b-Terminée{background:var(--done-bg);color:var(--done-ink)}
   .b-urg{background:var(--urg-bg);color:var(--urg-ink)}
+  .b-maj{background:var(--orange);color:#1A1006}
+  .recu{font-size:14px;font-weight:600;margin-top:6px;color:var(--done-ink)}
+  .recu.attente{color:var(--muted);font-weight:400}
+  .item.nouveau{border-color:var(--orange);box-shadow:inset 4px 0 0 var(--orange)}
+  .pastille{display:inline-block;min-width:22px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--orange);color:#1A1006;font-size:13px;line-height:22px}
+  .avis{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--prog-bg);color:var(--prog-ink);border-radius:10px;padding:8px 8px 8px 14px;margin-bottom:12px;font-weight:600}
+  .avis .link{color:var(--prog-ink);white-space:nowrap}
+  .btn.accuse{margin-top:10px}
   .b-fact{background:#E6F0FF;color:#0A3550}
   .b-nonfact{background:#ECEFF2;color:#4F5F6B}
   .b-pay0{background:#FDECEC;color:#9B1C1C}
@@ -153,7 +161,7 @@
 
 <main class="wrap">
   <p class="info" id="cacheInfo" role="status" hidden></p>
-  <p class="demo" id="demo" hidden>Aperçu : rien n'est enregistré dans le registre. Identifiant « admin » : espace HydroPlomb ; « responsable » : responsable d'une entreprise (voit toutes ses sollicitations) ; tout autre identifiant : simple utilisateur (ne voit que ce qu'il a déclaré).</p>
+  <p class="demo" id="demo" hidden>Aperçu : rien n'est enregistré dans le registre. Identifiant « admin » : espace HydroPlomb ; « responsable » : responsable d'une entreprise (voit toutes ses sollicitations) ; tout autre identifiant : simple utilisateur (ne voit que ce qu'il a déclaré). Essayez « Accuser réception » avec « admin », puis reconnectez-vous en client : la sollicitation porte le repère « Mis à jour ».</p>
 
   <!-- Connexion -->
   <section class="card" id="vLogin" style="margin-top:16px">
@@ -179,14 +187,14 @@
     <div class="tabs">
       <button class="tab" type="button" id="tAdmin" aria-pressed="false" hidden>Sollicitations</button>
       <button class="tab" type="button" id="tDecl" aria-pressed="true">Déclarer</button>
-      <button class="tab" type="button" id="tSuivi" aria-pressed="false">Suivi</button>
+      <button class="tab" type="button" id="tSuivi" aria-pressed="false">Suivi<span class="pastille" id="nSuivi" hidden></span></button>
       <button class="tab" type="button" id="tSynth" aria-pressed="false">Synthèse</button>
     </div>
 
     <!-- Espace administrateur -->
     <section id="vAdmin" hidden>
       <div class="stats">
-        <div class="stat"><strong id="sNew">0</strong><span>À traiter</span></div>
+        <div class="stat"><strong id="sNew">0</strong><span id="sNewTxt">À traiter</span></div>
         <div class="stat"><strong id="sProg">0</strong><span>En cours</span></div>
         <div class="stat"><strong id="sMois">0</strong><span>Ce mois-ci</span></div>
       </div>
@@ -202,6 +210,7 @@
     </section>
 
     <section class="card" id="vDecl" style="margin-top:0">
+      <div class="avis" id="majAvis" role="status" hidden><span id="majAvisTxt"></span><button class="link" type="button" id="bMajVoir">Voir</button></div>
       <div class="msg" id="declMsg" role="status" hidden></div>
       <form id="fDecl">
         <label id="lClient" hidden>Client<select name="client" id="selClient"></select></label>
@@ -266,7 +275,9 @@
         mois: iso(d).slice(0,7), client: client, declarant: decl, nom: 'Personne sur place (exemple)', contact: '07 00 00 00 0'+n, site: site,
         categorie: cat, urgence: urg, details: det, statut: statut, dateFin: f ? iso(f).split('-').reverse().join('/') : '', dateFinIso: f ? iso(f) : '',
         materiel: mat, mainOeuvre: mo, autres: aut, total: (mat||0)+(mo||0)+(aut||0), observations: obs || '', canal: 'Application HydroPlomb',
-        facturation: fact || '', paiement: pay || '', verse: verse || '' };
+        facturation: fact || '', paiement: pay || '', verse: verse || '',
+        recu: statut==='Nouvelle' ? '' : ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear()+' à '+h.replace(/^(\d\d)/, function(x){ return two(Math.min(23, +x+1)); }),
+        maj: 0, nouveau: false };
     }
     return [
       it(8, 0, '08:40', 'Entreprise exemple', 'Utilisateur exemple', 'Chantier exemple, bâtiment A', 'Fuite sur compteur', 'Urgente', 'Exemple : fuite visible au niveau du compteur, sol mouillé.', 'Nouvelle'),
@@ -279,6 +290,7 @@
       it(1, 41, '08:15', 'Client de démonstration', 'Responsable exemple', 'Site exemple', 'Branchement simple', 'Normale', 'Exemple : nouveau point d’eau à brancher.', 'Terminée', 36, 35000, 15000, 5000, 'Facturable', 'Soldé', 55000)
     ];
   })();
+  demoItems[2].maj = Date.now(); demoItems[2].nouveau = true;   // exemple de repère « Mis à jour »
 
   function $(id){ return document.getElementById(id); }
   function el(t,c,txt){ var e=document.createElement(t); if(c) e.className=c; if(txt!=null) e.textContent=txt; return e; }
@@ -323,7 +335,7 @@
      serveur (« REFUS: ») ou une session expirée. Les envois portent un identifiant (opId) :
      un nouvel essai ne crée jamais de doublon. */
   var DELAIS = { apiConnexion: 15000, apiReprendre: 12000, apiSuivi: 12000, apiSynthese: 15000, apiAdminListe: 15000,
-                 apiDeclarer: 45000, apiAdminMaj: 30000, apiJetonDurable: 15000, apiDeconnexion: 10000 };
+                 apiDeclarer: 45000, apiAdminMaj: 30000, apiAdminRecu: 30000, apiVu: 15000, apiJetonDurable: 15000, apiDeconnexion: 10000 };
   function appel(name, args, ok, ko){
     var fini = false;
     var t = setTimeout(function(){ if(!fini){ fini = true; ko(new Error('DELAI')); } }, DELAIS[name] || 20000);
@@ -364,17 +376,21 @@
           var d=args[1], now=new Date();
           var it={ numero: demoItems.length+1, date: two(now.getDate())+'/'+two(now.getMonth()+1)+'/'+now.getFullYear()+' à '+two(now.getHours())+':'+two(now.getMinutes()),
             mois: now.getFullYear()+'-'+two(now.getMonth()+1), client: DEMO_ADMIN?d.client:'Entreprise exemple', nom:d.nom, contact:d.contact, site:d.site, categorie:d.categorie, urgence:d.urgence, details:d.details,
-            statut:'Nouvelle', dateFin:'', dateFinIso:'', materiel:'', mainOeuvre:'', autres:'', total:0, observations:'', canal: DEMO_ADMIN?'Saisie HydroPlomb':'Application HydroPlomb', declarant: demoUtil() };
+            statut:'Nouvelle', dateFin:'', dateFinIso:'', materiel:'', mainOeuvre:'', autres:'', total:0, observations:'', canal: DEMO_ADMIN?'Saisie HydroPlomb':'Application HydroPlomb', declarant: demoUtil(), recu: DEMO_ADMIN?demoMaintenant():'', maj: 0, nouveau: false };
           demoItems.unshift(it); return ok(it.numero);
         }
         var moisCourant = new Date().getFullYear()+'-'+two(new Date().getMonth()+1);
-        if (name==='apiSuivi') { var mine=demoVisibles(); return ok({ duMois: mine.filter(function(x){ return x.mois===moisCourant; }).length, items: mine }); }
+        if (name==='apiSuivi') { var mine=demoVisibles(); return ok({ duMois: mine.filter(function(x){ return x.mois===moisCourant; }).length, items: JSON.parse(JSON.stringify(mine)) }); }
+        if (name==='apiVu') { args[1].forEach(function(v){ demoItems.forEach(function(x){ if(x.numero===v[0]) x.nouveau=false; }); }); return ok(true); }
+        if (name==='apiAdminRecu') { var xr=demoItems.filter(function(y){ return y.numero===args[1]; })[0]; if(!xr.recu){ xr.recu=demoMaintenant(); xr.maj=Date.now(); xr.nouveau=true; } return ok(xr); }
         if (name==='apiSynthese') { var mm=args[1], cc=DEMO_ADMIN?(args[2]||''):'Entreprise exemple'; return ok({ mois: mm, client: cc||'Tous les clients', items: (DEMO_ADMIN ? demoItems : demoVisibles()).filter(function(x){ return x.mois===mm && (!cc || x.client===cc); }) }); }
         if (name==='apiAdminListe') return ok({ items: demoItems, clients: DEMO_CLIENTS, stats: {
           aTraiter: demoItems.filter(function(x){return x.statut==='Nouvelle';}).length,
+          aAccuser: demoItems.filter(function(x){return x.statut==='Nouvelle' && !x.recu;}).length,
           enCours: demoItems.filter(function(x){return x.statut==='En cours';}).length, duMois: demoItems.filter(function(x){ return x.mois===moisCourant; }).length } });
         if (name==='apiAdminMaj') {
           var num=args[1], m=args[2], x=demoItems.filter(function(y){ return y.numero===num; })[0];
+          if(x.statut!==m.statut || x.observations!==m.observations || x.dateFinIso!==m.dateFin){ x.maj=Date.now(); x.nouveau=true; if(!x.recu && m.statut!=='Nouvelle') x.recu=demoMaintenant(); }
           x.statut=m.statut; x.dateFinIso=m.dateFin || (m.statut==='Terminée' ? now2iso() : '');
           x.dateFin=x.dateFinIso? x.dateFinIso.split('-').reverse().join('/') : '';
           x.materiel=m.materiel; x.mainOeuvre=m.mainOeuvre; x.autres=m.autres; x.observations=m.observations; x.facturation=m.facturation;
@@ -386,6 +402,7 @@
       } catch(e){ ko(e); }
     }, 300);
   }
+  function demoMaintenant(){ var n=new Date(); return two(n.getDate())+'/'+two(n.getMonth()+1)+'/'+n.getFullYear()+' à '+two(n.getHours())+':'+two(n.getMinutes()); }
   function now2iso(){ var n=new Date(); return n.getFullYear()+'-'+two(n.getMonth()+1)+'-'+two(n.getDate()); }
 
   /* ---------- Session ---------- */
@@ -446,7 +463,33 @@
     $('vLogin').hidden = true; $('vOuverture').hidden = true; $('vApp').hidden = false;
     majFaceID();
     if (premier || (VUE==='admin' && !ADMIN) || (VUE==='suivi' && ADMIN)) onglet(ADMIN ? 'admin' : 'decl');   // rôle changé depuis la dernière ouverture
+    afficherRepere();
+    if (!ADMIN && VUE!=='suivi') verifierMaj();
   }
+
+  /* ---------- Repère « Mis à jour » (clients) ----------
+     Après l'ouverture, le suivi est relu en arrière-plan : l'onglet « Suivi » affiche le nombre
+     de sollicitations mises à jour par HydroPlomb depuis la dernière consultation. */
+  var VERIF = 0;
+  function nbNouveaux(){ return (!ADMIN && ETAT && ETAT.suivi && ETAT.suivi.items) ? ETAT.suivi.items.filter(function(x){ return x.nouveau; }).length : 0; }
+  function afficherRepere(){
+    var n = nbNouveaux();
+    $('nSuivi').textContent = n; $('nSuivi').hidden = !n;
+    $('tSuivi').setAttribute('aria-label', n ? 'Suivi, ' + n + ' mise(s) à jour' : 'Suivi');
+    $('majAvisTxt').textContent = n === 1 ? 'Une de vos sollicitations a été mise à jour par HydroPlomb.' : n + ' de vos sollicitations ont été mises à jour par HydroPlomb.';
+    $('majAvis').hidden = !n;
+  }
+  function verifierMaj(){
+    if (DEMO && !CFG) return;
+    if (Date.now() - VERIF < 10000) return;   // déjà demandé à l'instant
+    VERIF = Date.now();
+    api('apiSuivi', [JETON], function(r){
+      if (ADMIN || !ETAT) return;
+      ETAT.suivi = r; ETAT.suiviLe = Date.now(); garder();
+      if (VUE==='suivi') rendreSuivi(r, true); else afficherRepere();
+    }, function(){ VERIF = 0; });
+  }
+  $('bMajVoir').addEventListener('click', function(){ onglet('suivi'); });
 
   function connecter(ident, mdp, source){
     $('bLogin').disabled = true; $('bLogin').textContent = 'Connexion…';
@@ -512,6 +555,7 @@
     ADMIN=false; CFG=null; DEPUIS=0; OPID=null; VUE=''; bandeau('');
     $('fLogin').reset(); $('fDecl').reset(); $('declMsg').hidden = true;
     $('list').textContent=''; $('aList').textContent=''; $('synBody').textContent='';
+    VERIF=0; $('nSuivi').hidden=true; $('majAvis').hidden=true;
     $('titre').textContent = 'Espace client';
     $('sousTitre').textContent = 'Connectez-vous pour déclarer et suivre vos sollicitations.';
     $('bLogout').hidden = true; $('vOuverture').hidden = true;
@@ -560,7 +604,7 @@
     $('bDecl').disabled = true; $('bDecl').textContent = 'Envoi en cours…';
     api('apiDeclarer', [JETON, d, OPID], function(num){
       OPID = null;
-      show(msg, 'Sollicitation N° '+pad(num)+' enregistrée.'+(ADMIN?'':' HydroPlomb vous recontacte rapidement.'), 'ok');
+      show(msg, 'Sollicitation N° '+pad(num)+' enregistrée.'+(ADMIN?'':' Vous verrez dans « Suivi » la confirmation de réception par HydroPlomb, puis l\u2019avancement.'), 'ok');
       f.reset();
       $('bDecl').disabled = false; $('bDecl').textContent = 'Envoyer la sollicitation';
       window.scrollTo(0,0);
@@ -578,7 +622,7 @@
   /* ---------- Carte d'une sollicitation (commune) ---------- */
   var PAYCL={'Non payé':'b-pay0','Acompte versé':'b-pay1','Soldé':'b-pay2'};
   function carte(it, avecClient){
-    var box=el('div','item');
+    var box=el('div', 'item' + (it.nouveau && !ADMIN ? ' nouveau' : ''));
     var top=el('div','top'); top.appendChild(el('span','no','N° '+pad(it.numero))); top.appendChild(el('span','d',it.date)); box.appendChild(top);
     if(it.declarant) box.appendChild(el('div','meta','Déclarée par '+it.declarant));
     if(avecClient && it.client) box.appendChild(el('div','cli',it.client));
@@ -597,11 +641,14 @@
       box.appendChild(meta);
     }
     var b=el('div','badges');
+    if(it.nouveau && !ADMIN) b.appendChild(el('span','badge b-maj','Mis à jour'));
     b.appendChild(el('span','badge b-'+it.statut.replace(' ','-'), it.statut));
     if(it.urgence==='Urgente') b.appendChild(el('span','badge b-urg','Urgente'));
     if(it.facturation) b.appendChild(el('span', it.facturation==='Facturable'?'badge b-fact':'badge b-nonfact', it.facturation));
     if(it.facturation==='Facturable' && PAYCL[it.paiement]) b.appendChild(el('span','badge '+PAYCL[it.paiement], it.paiement));
     box.appendChild(b);
+    if(it.recu) box.appendChild(el('div','recu','\u2713 Reçue par HydroPlomb le '+it.recu));
+    else if(it.statut==='Nouvelle' && !ADMIN) box.appendChild(el('div','recu attente','En attente de la confirmation de réception par HydroPlomb'));
     var extra=[];
     if(it.dateFin) extra.push('Terminée le '+it.dateFin);
     if(it.total) extra.push('Coût des travaux : '+money(it.total));
@@ -611,12 +658,21 @@
     return box;
   }
 
-  function rendreSuivi(r){
+  /* frais : données qui viennent du serveur. Les mises à jour affichées sont alors signalées
+     comme vues : le repère reste visible pendant cette consultation, puis disparaît. */
+  function rendreSuivi(r, frais){
     var list=$('list');
     $('duMois').textContent = r.duMois;
     list.textContent='';
-    if(!r.items.length){ list.appendChild(el('p','empty','Aucune sollicitation pour le moment.')); return; }
+    if(!r.items.length){ list.appendChild(el('p','empty','Aucune sollicitation pour le moment.')); }
     r.items.forEach(function(it){ list.appendChild(carte(it,false)); });
+    var vus = r.items.filter(function(x){ return x.nouveau; });
+    if (frais && vus.length) {
+      api('apiVu', [JETON, vus.map(function(x){ return [x.numero, x.maj]; })], function(){}, function(){});
+      vus.forEach(function(x){ x.nouveau = false; });
+      garder();
+    }
+    afficherRepere();
   }
   function charger(){
     var list=$('list'), garde = ETAT && ETAT.suivi;
@@ -624,8 +680,9 @@
     else { list.textContent=''; list.appendChild(el('p','empty','Chargement…')); }
     api('apiSuivi', [JETON], function(r){
       if (VUE!=='suivi') return;
-      if (ETAT) { ETAT.suivi = r; ETAT.suiviLe = Date.now(); garder(); }
-      rendreSuivi(r); bandeau('');
+      if (ETAT) { ETAT.suivi = r; ETAT.suiviLe = Date.now(); }
+      VERIF = Date.now();
+      rendreSuivi(r, true); garder(); bandeau('');
     }, function(e){
       if (VUE!=='suivi' || !JETON) return;
       if (garde) bandeau(errText(e) + ' Dernières données : ' + quand(ETAT.suiviLe) + '.', charger);
@@ -639,9 +696,23 @@
   /* ---------- Espace administrateur ---------- */
   function appliquerAdmin(r){
     ADATA = r;
-    $('sNew').textContent=r.stats.aTraiter; $('sProg').textContent=r.stats.enCours; $('sMois').textContent=r.stats.duMois;
+    statNouvelles(r.stats); $('sProg').textContent=r.stats.enCours; $('sMois').textContent=r.stats.duMois;
     var cur=AF.client; fillSelect($('fClient'), r.clients, 'Tous les clients'); $('fClient').value=cur;
     rendreAdmin();
+  }
+  function statNouvelles(st){
+    $('sNew').textContent = st.aTraiter;
+    $('sNewTxt').textContent = st.aAccuser ? 'À traiter, dont ' + st.aAccuser + ' à confirmer' : 'À traiter';
+  }
+  function recompter(){
+    ADATA.stats.aTraiter=ADATA.items.filter(function(x){return x.statut==='Nouvelle';}).length;
+    ADATA.stats.aAccuser=ADATA.items.filter(function(x){return x.statut==='Nouvelle' && !x.recu;}).length;
+    ADATA.stats.enCours=ADATA.items.filter(function(x){return x.statut==='En cours';}).length;
+    statNouvelles(ADATA.stats); $('sProg').textContent=ADATA.stats.enCours;
+    if (ETAT) { ETAT.admin = ADATA; ETAT.adminLe = Date.now(); garder(); }
+  }
+  function remplacer(nv){
+    for(var i=0;i<ADATA.items.length;i++){ if(ADATA.items[i].numero===nv.numero){ nv.mois=ADATA.items[i].mois; ADATA.items[i]=nv; } }
   }
   function chargerAdmin(){
     var list=$('aList'), garde = ETAT && ETAT.admin;
@@ -685,6 +756,17 @@
     if(!items.length){ list.appendChild(el('p','empty', ADATA.items.length?'Aucune sollicitation ne correspond à ces filtres.':'Aucune sollicitation pour le moment.')); return; }
     items.forEach(function(it){
       var box=carte(it,true);
+      if(it.statut==='Nouvelle' && !it.recu){
+        var ac=el('button','btn accuse','Accuser réception'); ac.type='button';
+        var acErr=el('div','msg err'); acErr.hidden=true;
+        ac.addEventListener('click', function(){
+          ac.disabled=true; ac.textContent='Envoi…'; acErr.hidden=true;
+          api('apiAdminRecu', [JETON, it.numero], function(nv){ remplacer(nv); recompter(); rendreAdmin(); },
+            function(e){ ac.disabled=false; ac.textContent='Accuser réception'; acErr.textContent=errText(e); acErr.hidden=false; },
+            function(n){ ac.textContent='Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…'; });
+        });
+        box.appendChild(ac); box.appendChild(acErr);
+      }
       var tg=el('button','link',OUVERT===it.numero?'Fermer':'Mettre à jour le traitement'); tg.type='button';
       tg.addEventListener('click', function(){ OUVERT = OUVERT===it.numero ? null : it.numero; rendreAdmin(); });
       box.appendChild(tg);
@@ -741,11 +823,7 @@
       if(fin.value && it.dateFinIso!==fin.value && st.value!=='Terminée' && !confirm('Une date de fin est renseignée alors que le statut n\u2019est pas « Terminée ». Enregistrer quand même ?')) return;
       ok.disabled=true; ok.textContent='Enregistrement…';
       api('apiAdminMaj', [JETON, it.numero, { statut: st.value, dateFin: fin.value, materiel: mat.value, mainOeuvre: mo.value, autres: aut.value, observations: obs.value, facturation: factVal(), paiement: payVal(), verse: ver.value }], function(nv){
-        for(var i=0;i<ADATA.items.length;i++){ if(ADATA.items[i].numero===nv.numero){ nv.mois=ADATA.items[i].mois; ADATA.items[i]=nv; } }
-        ADATA.stats.aTraiter=ADATA.items.filter(function(x){return x.statut==='Nouvelle';}).length;
-        ADATA.stats.enCours=ADATA.items.filter(function(x){return x.statut==='En cours';}).length;
-        $('sNew').textContent=ADATA.stats.aTraiter; $('sProg').textContent=ADATA.stats.enCours;
-        if (ETAT) { ETAT.admin = ADATA; ETAT.adminLe = Date.now(); garder(); }
+        remplacer(nv); recompter();
         OUVERT=null; rendreAdmin();
       }, function(e){ ok.disabled=false; ok.textContent='Enregistrer'; err.textContent=errText(e); err.hidden=false; },
       function(n){ ok.textContent='Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…'; });
