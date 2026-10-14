@@ -82,6 +82,20 @@
   .avis{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--prog-bg);color:var(--prog-ink);border-radius:10px;padding:8px 8px 8px 14px;margin-bottom:12px;font-weight:600}
   .avis .link{color:var(--prog-ink);white-space:nowrap}
   .btn.accuse{margin-top:10px}
+  .pj{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+  .pj-l{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:15px}
+  .pj-l a{color:var(--navy);font-weight:700;overflow-wrap:anywhere}
+  .pj-l .d{color:var(--muted);font-size:13px}
+  .pj-l .link{min-height:0;padding:0;font-size:14px;color:var(--urg-ink)}
+  .pj-etat{font-size:14px;font-weight:600;color:var(--muted)}
+  .pj-etat.err{color:var(--urg-ink)}
+  .fichiers{font-size:15px;padding:10px;background:var(--surface)}
+  .tabs.quatre .tab{font-size:14px;padding:10px 4px}
+  @media (max-width:420px){ .tabs.quatre{gap:4px} .tabs.quatre .tab{font-size:12.5px;padding:8px 2px} }
+  .u-l{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;font-size:14px;margin-top:6px}
+  .u-l dt{color:var(--muted)}
+  .u-l dd{margin:0;font-weight:600}
+  .u-jamais{color:var(--urg-ink)}
   .b-fact{background:#E6F0FF;color:#0A3550}
   .b-nonfact{background:#ECEFF2;color:#4F5F6B}
   .b-pay0{background:#FDECEC;color:#9B1C1C}
@@ -189,6 +203,7 @@
       <button class="tab" type="button" id="tDecl" aria-pressed="true">Déclarer</button>
       <button class="tab" type="button" id="tSuivi" aria-pressed="false">Suivi<span class="pastille" id="nSuivi" hidden></span></button>
       <button class="tab" type="button" id="tSynth" aria-pressed="false">Synthèse</button>
+      <button class="tab" type="button" id="tUtil" aria-pressed="false" hidden>Utilisateurs</button>
     </div>
 
     <!-- Espace administrateur -->
@@ -228,6 +243,7 @@
         </fieldset>
         <label>Détails<textarea name="details" maxlength="2000" required placeholder="Décrivez le problème : constat, emplacement précis, depuis quand…"></textarea></label>
         <p class="dicte"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Vous pouvez dicter : touchez le micro de votre clavier.</p>
+        <label>Photos ou documents (facultatif)<input class="fichiers" type="file" id="declFichiers" accept="image/*,application/pdf" multiple></label>
         <button class="btn" type="submit" id="bDecl">Envoyer la sollicitation</button>
       </form>
     </section>
@@ -238,6 +254,19 @@
         <div id="list"></div>
         <button class="link" type="button" id="bRefresh">Actualiser</button>
       </div>
+    </section>
+
+    <!-- Statistiques des utilisateurs (HydroPlomb) -->
+    <section id="vUtil" hidden>
+      <div class="stats stats4">
+        <div class="stat"><strong id="uActifs">0</strong><span>Actifs ce mois-ci</span></div>
+        <div class="stat"><strong id="uJamais">0</strong><span>Pas encore connectés</span></div>
+        <div class="stat"><strong id="uOuv">0</strong><span>Ouvertures ce mois-ci</span></div>
+        <div class="stat"><strong id="uDecl">0</strong><span>Sollicitations ce mois-ci</span></div>
+      </div>
+      <p class="note" id="uDepuis" style="margin:0 0 10px"></p>
+      <div id="uList"></div>
+      <button class="link" type="button" id="bURefresh">Actualiser</button>
     </section>
 
     <!-- Synthèse mensuelle -->
@@ -291,6 +320,11 @@
     ];
   })();
   demoItems[2].maj = Date.now(); demoItems[2].nouveau = true;   // exemple de repère « Mis à jour »
+  // Exemple de pièce jointe : un reçu fictif (image dessinée dans la page)
+  (function(){
+    var svg='<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420"><rect width="600" height="420" fill="#fff"/><rect x="0" y="0" width="600" height="70" fill="#0A3550"/><text x="30" y="45" font-family="Arial" font-size="26" font-weight="bold" fill="#fff">HydroPlomb – Reçu (exemple)</text><text x="30" y="130" font-family="Arial" font-size="20" fill="#13202B">Sollicitation N° 006 – Entreprise exemple</text><text x="30" y="180" font-family="Arial" font-size="20" fill="#13202B">Remplacement d’un robinet d’arrêt</text><text x="30" y="250" font-family="Arial" font-size="24" font-weight="bold" fill="#13202B">Montant réglé : 25 000 FCFA</text><text x="30" y="380" font-family="Arial" font-size="16" fill="#4F5F6B">Document fictif de démonstration</text></svg>';
+    demoItems[2].pieces=[{ id:'demo-recu', nom:'Reçu de paiement (exemple).svg', type:'image/svg+xml', taille:svg.length, par:'HydroPlomb', hp:true, le:demoItems[2].dateFin+' à 17:30', lien:URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'})) }];
+  })();
 
   function $(id){ return document.getElementById(id); }
   function el(t,c,txt){ var e=document.createElement(t); if(c) e.className=c; if(txt!=null) e.textContent=txt; return e; }
@@ -335,7 +369,7 @@
      serveur (« REFUS: ») ou une session expirée. Les envois portent un identifiant (opId) :
      un nouvel essai ne crée jamais de doublon. */
   var DELAIS = { apiConnexion: 15000, apiReprendre: 12000, apiSuivi: 12000, apiSynthese: 15000, apiAdminListe: 15000,
-                 apiDeclarer: 45000, apiAdminMaj: 30000, apiAdminRecu: 30000, apiVu: 15000, apiJetonDurable: 15000, apiDeconnexion: 10000 };
+                 apiDeclarer: 45000, apiAdminMaj: 30000, apiAdminRecu: 30000, apiVu: 15000, apiAjouterPiece: 120000, apiRetirerPiece: 30000, apiAdminUtilisateurs: 20000, apiJetonDurable: 15000, apiDeconnexion: 10000 };
   function appel(name, args, ok, ko){
     var fini = false;
     var t = setTimeout(function(){ if(!fini){ fini = true; ko(new Error('DELAI')); } }, DELAIS[name] || 20000);
@@ -382,6 +416,24 @@
         var moisCourant = new Date().getFullYear()+'-'+two(new Date().getMonth()+1);
         if (name==='apiSuivi') { var mine=demoVisibles(); return ok({ duMois: mine.filter(function(x){ return x.mois===moisCourant; }).length, items: JSON.parse(JSON.stringify(mine)) }); }
         if (name==='apiVu') { args[1].forEach(function(v){ demoItems.forEach(function(x){ if(x.numero===v[0]) x.nouveau=false; }); }); return ok(true); }
+        if (name==='apiAdminUtilisateurs') {
+          var h=function(j,hh){ var d=new Date(Date.now()-j*864e5); return two(d.getDate())+'/'+two(d.getMonth()+1)+'/'+d.getFullYear()+' à '+hh; };
+          var L=[
+            { nom:'Responsable exemple', entreprise:'Client de démonstration', role:'Responsable', actif:true, derniereTxt:h(0,'08:52'), ouverturesMois:23, ouverturesTotal:41, faceid:true, declMois:2, declTotal:4, pieces:3, nonVues:0 },
+            { nom:'Utilisateur exemple', entreprise:'Entreprise exemple', role:'Client', actif:true, derniereTxt:h(1,'17:40'), ouverturesMois:9, ouverturesTotal:15, faceid:true, declMois:2, declTotal:3, pieces:1, nonVues:1 },
+            { nom:'Autre utilisateur exemple', entreprise:'Entreprise exemple', role:'Client', actif:true, derniereTxt:h(12,'10:05'), ouverturesMois:2, ouverturesTotal:6, faceid:false, declMois:0, declTotal:1, pieces:0, nonVues:0 },
+            { nom:'Nouvel utilisateur exemple', entreprise:'Client de démonstration', role:'Client', actif:true, derniereTxt:'', ouverturesMois:0, ouverturesTotal:0, faceid:false, declMois:0, declTotal:0, pieces:0, nonVues:0 }
+          ];
+          return ok({ depuis:'01/10/2026', resume:{ actifsMois:3, jamais:1, ouverturesMois:34, declMois:demoItems.filter(function(x){ return x.mois===moisCourant; }).length }, lignes:L });
+        }
+        if (name==='apiAjouterPiece') {
+          var xp=demoItems.filter(function(y){ return y.numero===args[1]; })[0], fp=args[2];
+          var oct=atob(fp.donnees), u8=new Uint8Array(oct.length); for(var k=0;k<oct.length;k++) u8[k]=oct.charCodeAt(k);
+          xp.pieces=(xp.pieces||[]).concat([{ id:'demo'+Date.now(), nom:fp.nom, type:fp.type, taille:u8.length, par:demoUtil(), hp:DEMO_ADMIN, le:demoMaintenant(), lien:URL.createObjectURL(new Blob([u8],{type:fp.type})) }]);
+          if(DEMO_ADMIN){ xp.maj=Date.now(); xp.nouveau=true; }
+          return ok(JSON.parse(JSON.stringify(xp)));
+        }
+        if (name==='apiRetirerPiece') { var xq=demoItems.filter(function(y){ return y.numero===args[1]; })[0]; xq.pieces=(xq.pieces||[]).filter(function(q){ return q.id!==args[2]; }); return ok(JSON.parse(JSON.stringify(xq))); }
         if (name==='apiAdminRecu') { var xr=demoItems.filter(function(y){ return y.numero===args[1]; })[0]; if(!xr.recu){ xr.recu=demoMaintenant(); xr.maj=Date.now(); xr.nouveau=true; } return ok(xr); }
         if (name==='apiSynthese') { var mm=args[1], cc=DEMO_ADMIN?(args[2]||''):'Entreprise exemple'; return ok({ mois: mm, client: cc||'Tous les clients', items: (DEMO_ADMIN ? demoItems : demoVisibles()).filter(function(x){ return x.mois===mm && (!cc || x.client===cc); }) }); }
         if (name==='apiAdminListe') return ok({ items: demoItems, clients: DEMO_CLIENTS, stats: {
@@ -457,12 +509,13 @@
     $('duMoisTxt').textContent = cfg.responsable ? 'sollicitation(s) de l\u2019entreprise ce mois-ci' : 'sollicitation(s) déclarée(s) par vous ce mois-ci';
     $('bLogout').hidden = false;
     $('lClient').hidden = !ADMIN;
-    $('tAdmin').hidden = !ADMIN; $('tSuivi').hidden = ADMIN;
+    $('tAdmin').hidden = !ADMIN; $('tSuivi').hidden = ADMIN; $('tUtil').hidden = !ADMIN;
+    document.querySelector('.tabs').classList.toggle('quatre', ADMIN);
     if (ADMIN) { fillSelect($('selClient'), cfg.clients || [], 'Choisir le client'); fillSelect($('fClient'), cfg.clients || [], 'Tous les clients'); }
     fillSelect($('synClient'), ADMIN ? (cfg.clients || []) : [], 'Tous les clients'); $('lSynClient').hidden = !ADMIN;
     $('vLogin').hidden = true; $('vOuverture').hidden = true; $('vApp').hidden = false;
     majFaceID();
-    if (premier || (VUE==='admin' && !ADMIN) || (VUE==='suivi' && ADMIN)) onglet(ADMIN ? 'admin' : 'decl');   // rôle changé depuis la dernière ouverture
+    if (premier || ((VUE==='admin' || VUE==='util') && !ADMIN) || (VUE==='suivi' && ADMIN)) onglet(ADMIN ? 'admin' : 'decl');   // rôle changé depuis la dernière ouverture
     afficherRepere();
     if (!ADMIN && VUE!=='suivi') verifierMaj();
   }
@@ -554,7 +607,7 @@
   function afficherConnexion(){
     ADMIN=false; CFG=null; DEPUIS=0; OPID=null; VUE=''; bandeau('');
     $('fLogin').reset(); $('fDecl').reset(); $('declMsg').hidden = true;
-    $('list').textContent=''; $('aList').textContent=''; $('synBody').textContent='';
+    $('list').textContent=''; $('aList').textContent=''; $('synBody').textContent=''; $('uList').textContent='';
     VERIF=0; $('nSuivi').hidden=true; $('majAvis').hidden=true;
     $('titre').textContent = 'Espace client';
     $('sousTitre').textContent = 'Connectez-vous pour déclarer et suivre vos sollicitations.';
@@ -580,15 +633,19 @@
     $('tDecl').setAttribute('aria-pressed', String(nom==='decl'));
     $('tSuivi').setAttribute('aria-pressed', String(nom==='suivi'));
     $('tSynth').setAttribute('aria-pressed', String(nom==='synth'));
+    $('tUtil').setAttribute('aria-pressed', String(nom==='util')); $('vUtil').hidden = nom!=='util';
     $('vAdmin').hidden = nom!=='admin'; $('vDecl').hidden = nom!=='decl'; $('vSuivi').hidden = nom!=='suivi'; $('vSynth').hidden = nom!=='synth';
     if (nom==='suivi') charger();
     if (nom==='synth') chargerSynthese();
     if (nom==='admin') chargerAdmin();
+    if (nom==='util') chargerUtilisateurs();
   }
   $('tAdmin').addEventListener('click', function(){ onglet('admin'); });
   $('tDecl').addEventListener('click', function(){ onglet('decl'); });
   $('tSuivi').addEventListener('click', function(){ onglet('suivi'); });
   $('tSynth').addEventListener('click', function(){ onglet('synth'); });
+  $('tUtil').addEventListener('click', function(){ onglet('util'); });
+  $('bURefresh').addEventListener('click', function(){ chargerUtilisateurs(); });
   $('bRefresh').addEventListener('click', charger);
   $('bARefresh').addEventListener('click', chargerAdmin);
 
@@ -602,12 +659,20 @@
     if(!d.nom.trim()||!d.contact.trim()||!d.site.trim()||!d.details.trim()){ show(msg,'Renseignez la personne sur place, son contact, le chantier et les détails.','err'); return; }
     if (!OPID) OPID = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
     $('bDecl').disabled = true; $('bDecl').textContent = 'Envoi en cours…';
+    var fichiers = Array.prototype.slice.call($('declFichiers').files || []);
+    d.pieces = fichiers.length;
     api('apiDeclarer', [JETON, d, OPID], function(num){
       OPID = null;
-      show(msg, 'Sollicitation N° '+pad(num)+' enregistrée.'+(ADMIN?'':' Vous verrez dans « Suivi » la confirmation de réception par HydroPlomb, puis l\u2019avancement.'), 'ok');
-      f.reset();
-      $('bDecl').disabled = false; $('bDecl').textContent = 'Envoyer la sollicitation';
-      window.scrollTo(0,0);
+      var texte = 'Sollicitation N° '+pad(num)+' enregistrée.'+(ADMIN?'':' Vous verrez dans « Suivi » la confirmation de réception par HydroPlomb, puis l\u2019avancement.');
+      var fin = function(echecs, erreur){
+        show(msg, texte + (echecs ? ' ' + (echecs > 1 ? echecs + ' fichiers n\u2019ont pas pu être joints' : 'Un fichier n\u2019a pas pu être joint') + ' (' + String(erreur || '').replace(/\.$/, '') + ') : vous pouvez le faire depuis « ' + (ADMIN ? 'Sollicitations' : 'Suivi') + ' ».' : ''), echecs ? 'err' : 'ok');
+        f.reset();
+        $('bDecl').disabled = false; $('bDecl').textContent = 'Envoyer la sollicitation';
+        window.scrollTo(0,0);
+      };
+      if (!fichiers.length) return fin(0);
+      show(msg, 'Sollicitation N° '+pad(num)+' enregistrée. Envoi des pièces jointes…', 'ok'); window.scrollTo(0,0);
+      envoyerPieces(num, fichiers, true, function(i, n){ $('bDecl').textContent = 'Pièce jointe ' + i + ' sur ' + n + '…'; }, function(nv, echecs, erreur){ fin(echecs, erreur); });
     }, function(e){
       var refus = texteErr(e).indexOf('REFUS: ') >= 0;
       show(msg, refus ? errText(e) : errText(e) + ' Votre saisie est conservée : touchez de nouveau « Envoyer », la sollicitation ne sera pas enregistrée deux fois.', 'err');
@@ -655,7 +720,99 @@
     if(it.facturation==='Facturable' && it.paiement==='Acompte versé') extra.push('Acompte versé : '+money(nb(it.verse))+(it.total?', reste à payer : '+money(Math.max(0,it.total-nb(it.verse))):''));
     if(it.observations) extra.push(it.observations);
     if(extra.length) box.appendChild(el('div','obs',extra.join(' — ')));
+    if(it.pieces && it.pieces.length){
+      var pj=el('div','pj');
+      it.pieces.forEach(function(pc){
+        var l=el('div','pj-l');
+        var a=el('a',null,'\uD83D\uDCCE '+pc.nom); a.href=pc.lien; a.target='_blank'; a.rel='noopener'; l.appendChild(a);
+        l.appendChild(el('span','d',taille(pc.taille)+' · '+(pc.hp?'HydroPlomb':pc.par)+', '+pc.le));
+        if(ADMIN){
+          var rm=el('button','link','Retirer'); rm.type='button';
+          rm.addEventListener('click', function(){
+            if(!confirm('Retirer « '+pc.nom+' » de la sollicitation N° '+pad(it.numero)+' ? Le fichier ira dans la corbeille de votre Google Drive.')) return;
+            rm.disabled=true; rm.textContent='Retrait…';
+            api('apiRetirerPiece', [JETON, it.numero, pc.id], function(nv){ remplacer(nv); recompter(); rendreAdmin(); },
+              function(e){ rm.disabled=false; rm.textContent='Retirer'; alert(errText(e)); });
+          });
+          l.appendChild(rm);
+        }
+        pj.appendChild(l);
+      });
+      box.appendChild(pj);
+    }
     return box;
+  }
+  function taille(o){ o=Number(o)||0; return o>=1048576 ? (Math.round(o/104857.6)/10).toLocaleString('fr-FR')+' Mo' : Math.max(1,Math.round(o/1024))+' Ko'; }
+
+  /* ---------- Pièces jointes ----------
+     Les photos sont réduites dans le téléphone avant l'envoi (1600 pixels au plus, JPEG) :
+     l'envoi est rapide même en données mobiles. Les PDF sont envoyés tels quels (10 Mo au plus). */
+  var PJ_MAX = 10 * 1024 * 1024;
+  function lireBase64(blob, ok, ko){
+    var r = new FileReader();
+    r.onload = function(){ var t = String(r.result); ok(t.slice(t.indexOf(',') + 1)); };
+    r.onerror = function(){ ko(new Error('REFUS: Fichier illisible.')); };
+    r.readAsDataURL(blob);
+  }
+  function preparerFichier(file, ok, ko){
+    var type = String(file.type || '').toLowerCase(), nom = file.name || 'Pièce jointe';
+    if (!type && /\.pdf$/i.test(nom)) type = 'application/pdf';
+    if (!type && /\.hei[cf]$/i.test(nom)) type = 'image/heic';
+    var brut = function(){
+      if (['image/jpeg','image/png','image/webp','image/heic','application/pdf'].indexOf(type) < 0) return ko(new Error('REFUS: « '+nom+' » : photo ou PDF seulement.'));
+      if (file.size > PJ_MAX) return ko(new Error('REFUS: « '+nom+' » est trop lourd (10 Mo au plus).'));
+      lireBase64(file, function(b){ ok({ nom: nom, type: type, donnees: b }); }, ko);
+    };
+    if (type.indexOf('image/') !== 0) return brut();
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function(){
+      var k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function(b){
+        if (!b) return brut();
+        lireBase64(b, function(d){ ok({ nom: nom.replace(/\.[A-Za-z0-9]{2,5}$/, '') + '.jpg', type: 'image/jpeg', donnees: d }); }, ko);
+      }, 'image/jpeg', 0.82);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); brut(); };   // format que le navigateur ne sait pas afficher : envoyé tel quel
+    img.src = url;
+  }
+  /* Envoie les fichiers un par un ; fin(dernière version de la sollicitation, nombre d'échecs, dernier message d'erreur) */
+  function envoyerPieces(numero, fichiers, avecDeclaration, progres, fin){
+    var i = 0, echecs = 0, dernier = null, erreur = '';
+    (function suivant(){
+      if (i >= fichiers.length) return fin(dernier, echecs, erreur);
+      var file = fichiers[i++]; progres(i, fichiers.length);
+      preparerFichier(file, function(f){
+        var op = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+        api('apiAjouterPiece', [JETON, numero, f, op, !!avecDeclaration], function(nv){ dernier = nv; suivant(); },
+          function(e){ echecs++; erreur = errText(e); suivant(); },
+          function(n){ progres(i, fichiers.length, n); });
+      }, function(e){ echecs++; erreur = errText(e); suivant(); });
+    })();
+  }
+  /* Bouton « Joindre une photo ou un fichier » d'une carte ; apres(nouvelle version) met l'écran à jour. */
+  function boutonPiece(it, apres){
+    var zone = el('div'), inp = el('input'), b = el('button','link','\uD83D\uDCCE Joindre une photo ou un fichier'), etat = el('div','pj-etat');
+    inp.type = 'file'; inp.accept = 'image/*,application/pdf'; inp.multiple = true; inp.hidden = true; etat.hidden = true;
+    b.type = 'button';
+    b.addEventListener('click', function(){ inp.click(); });
+    inp.addEventListener('change', function(){
+      var fichiers = Array.prototype.slice.call(inp.files || []); inp.value = '';
+      if (!fichiers.length) return;
+      b.disabled = true; etat.hidden = false; etat.className = 'pj-etat';
+      envoyerPieces(it.numero, fichiers, false, function(i, n, essai){
+        etat.textContent = 'Envoi ' + (n > 1 ? 'du fichier ' + i + ' sur ' + n : 'du fichier') + '…' + (essai ? ' Connexion lente, nouvel essai (' + (essai+1) + ' sur 3).' : '');
+      }, function(nv, echecs, erreur){
+        b.disabled = false;
+        if (nv) apres(nv);
+        if (echecs) { etat.hidden = false; etat.className = 'pj-etat err'; etat.textContent = erreur + (fichiers.length > 1 ? ' (' + echecs + ' fichier(s) non joints)' : ''); }
+        else etat.hidden = true;
+      });
+    });
+    zone.appendChild(inp); zone.appendChild(b); zone.appendChild(etat);
+    return zone;
   }
 
   /* frais : données qui viennent du serveur. Les mises à jour affichées sont alors signalées
@@ -665,7 +822,15 @@
     $('duMois').textContent = r.duMois;
     list.textContent='';
     if(!r.items.length){ list.appendChild(el('p','empty','Aucune sollicitation pour le moment.')); }
-    r.items.forEach(function(it){ list.appendChild(carte(it,false)); });
+    r.items.forEach(function(it){
+      var box = carte(it,false);
+      box.appendChild(boutonPiece(it, function(nv){
+        nv.nouveau = false;
+        for (var i=0;i<r.items.length;i++) if (r.items[i].numero===nv.numero) { nv.mois=r.items[i].mois; r.items[i]=nv; }
+        garder(); rendreSuivi(r, false);
+      }));
+      list.appendChild(box);
+    });
     var vus = r.items.filter(function(x){ return x.nouveau; });
     if (frais && vus.length) {
       api('apiVu', [JETON, vus.map(function(x){ return [x.numero, x.maj]; })], function(){}, function(){});
@@ -767,6 +932,7 @@
         });
         box.appendChild(ac); box.appendChild(acErr);
       }
+      box.appendChild(boutonPiece(it, function(nv){ remplacer(nv); recompter(); rendreAdmin(); }));
       var tg=el('button','link',OUVERT===it.numero?'Fermer':'Mettre à jour le traitement'); tg.type='button';
       tg.addEventListener('click', function(){ OUVERT = OUVERT===it.numero ? null : it.numero; rendreAdmin(); });
       box.appendChild(tg);
@@ -829,6 +995,37 @@
       function(n){ ok.textContent='Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…'; });
     });
     return f;
+  }
+
+  /* ---------- Statistiques des utilisateurs (HydroPlomb) ---------- */
+  function chargerUtilisateurs(){
+    var list=$('uList');
+    list.textContent=''; list.appendChild(el('p','empty','Chargement…'));
+    api('apiAdminUtilisateurs', [JETON], function(r){ if (VUE==='util') rendreUtilisateurs(r); },
+      function(e){ if (VUE==='util' && JETON) erreurBloc(list, e, chargerUtilisateurs); },
+      function(n){ list.textContent=''; list.appendChild(el('p','empty','Connexion lente, nouvel essai (' + (n+1) + ' sur 3)…')); });
+  }
+  function rendreUtilisateurs(r){
+    $('uActifs').textContent=r.resume.actifsMois; $('uJamais').textContent=r.resume.jamais;
+    $('uOuv').textContent=r.resume.ouverturesMois; $('uDecl').textContent=r.resume.declMois;
+    $('uDepuis').textContent = r.depuis ? 'Ouvertures de l\u2019application comptées depuis le ' + r.depuis + '. Sollicitations et pièces jointes : depuis le début.' : '';
+    var list=$('uList'); list.textContent='';
+    if(!r.lignes.length){ list.appendChild(el('p','empty','Aucun compte client pour le moment.')); return; }
+    r.lignes.forEach(function(l){
+      var box=el('div','item');
+      var top=el('div','top'); top.appendChild(el('span','no',l.nom)); top.appendChild(el('span','d',l.role+(l.actif?'':' · accès coupé'))); box.appendChild(top);
+      box.appendChild(el('div','cli',l.entreprise));
+      var dl=el('dl','u-l');
+      var ligne=function(k,v,cl){ dl.appendChild(el('dt',null,k)); dl.appendChild(el('dd',cl||null,v)); };
+      ligne('Dernière ouverture', l.derniereTxt || 'Pas encore connecté', l.derniereTxt ? null : 'u-jamais');
+      ligne('Ouvertures', l.ouverturesMois+' ce mois-ci · '+l.ouverturesTotal+' au total');
+      ligne('Face ID', l.faceid ? 'Activé' : 'Non activé');
+      ligne('Sollicitations', l.declMois+' ce mois-ci · '+l.declTotal+' au total');
+      ligne('Pièces jointes', String(l.pieces));
+      if(l.nonVues) ligne('Non consultées', l.nonVues+' mise(s) à jour');
+      box.appendChild(dl);
+      list.appendChild(box);
+    });
   }
 
   /* ---------- Synthèse mensuelle ---------- */
