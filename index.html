@@ -80,6 +80,9 @@
   var $ = function (id) { return document.getElementById(id); };
   var fid = $('fid'), texte = $('fidTexte'), ok = $('fidOk'), okTexte = $('fidOkTexte'), non = $('fidNon'), off = $('fidOff'), err = $('fidErr');
   var app = null, origineApp = null, mode = null, aActiver = null, enAttente = null;
+  /* iOS (16 et plus) accepte une demande Face ID sans toucher l'écran, une seule fois par ouverture de la page :
+     elle est faite dès que l'application affiche l'écran de connexion. Le bouton reste là en secours. */
+  var autoFait = false;
   var ua = navigator.userAgent;
   var ios = /iP(hone|ad|od)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var LIB = ios ? 'Face ID' : /Mac/.test(navigator.platform) ? 'Touch ID' : /Android/i.test(ua) ? 'l’empreinte' : /Windows/i.test(ua) ? 'Windows Hello' : 'l’empreinte ou le visage';
@@ -117,18 +120,27 @@
   }
   function cacher() { fid.hidden = true; mode = null; }
 
-  ok.addEventListener('click', function () {
+  /* auto : demande faite sans toucher l'écran ; en cas d'échec, le bouton reste proposé sans message d'erreur. */
+  function deverrouiller(auto) {
+    var s = lire(FID); if (!s) { cacher(); return; }
     ok.disabled = true; err.hidden = true;
+    navigator.credentials.get({ publicKey: { challenge: alea(32), allowCredentials: [{ type: 'public-key', id: depuisB64(s.id) }], userVerification: 'required', timeout: 60000 } })
+      .then(function () {
+        if (mode !== 'deverrouiller') return;   // entre-temps : « Utiliser identifiant et mot de passe »
+        cacher();
+        if (s.jeton) { var g = lire(ETAT); envoyer({ hp: 'jeton', jeton: s.jeton, etat: g && g.j === s.jeton ? g : null }); }
+        else if (s.mdp) envoyer({ hp: 'identifiants', ident: s.ident, mdp: s.mdp });   // ancien enregistrement : remplacé par un jeton
+      })
+      .catch(function () {
+        ok.disabled = false;
+        if (!auto) { err.textContent = LIB + ' n’a pas abouti. Réessayez, ou utilisez votre mot de passe.'; err.hidden = false; }
+      });
+  }
+  ok.addEventListener('click', function () {
     if (mode === 'deverrouiller') {
-      var s = lire(FID); if (!s) { cacher(); return; }
-      navigator.credentials.get({ publicKey: { challenge: alea(32), allowCredentials: [{ type: 'public-key', id: depuisB64(s.id) }], userVerification: 'required', timeout: 60000 } })
-        .then(function () {
-          cacher();
-          if (s.jeton) { var g = lire(ETAT); envoyer({ hp: 'jeton', jeton: s.jeton, etat: g && g.j === s.jeton ? g : null }); }
-          else if (s.mdp) envoyer({ hp: 'identifiants', ident: s.ident, mdp: s.mdp });   // ancien enregistrement : remplacé par un jeton
-        })
-        .catch(function () { ok.disabled = false; err.textContent = LIB + ' n’a pas abouti. Réessayez, ou utilisez votre mot de passe.'; err.hidden = false; });
+      deverrouiller(false);
     } else if (mode === 'activer' && aActiver) {
+      ok.disabled = true; err.hidden = true;
       navigator.credentials.create({ publicKey: {
           rp: { name: 'HydroPlomb' },
           user: { id: alea(16), name: aActiver.ident, displayName: aActiver.ident },
@@ -164,7 +176,10 @@
     vivant();
     if (nouveau || d.hp === 'bonjour') annoncer();
     if (d.hp === 'pret') {
-      if (lire(FID) && disponible()) montrer('deverrouiller'); else cacher();
+      if (lire(FID) && disponible()) {
+        if (mode !== 'deverrouiller') montrer('deverrouiller');
+        if (!autoFait) { autoFait = true; deverrouiller(true); }
+      } else cacher();
     } else if (d.hp === 'connecte' && d.ident) {
       if (lire(FID) || !disponible()) return;
       var refus = ''; try { refus = sessionStorage.getItem(REFUS) || ''; } catch (x) {}
