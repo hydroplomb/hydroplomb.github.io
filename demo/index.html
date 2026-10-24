@@ -946,7 +946,7 @@
     var f=el('form','edit');
     var st=el('select'); ['Nouvelle','En cours','Terminée'].forEach(function(s){ var o=el('option',null,s); o.value=s; st.appendChild(o); }); st.value=it.statut;
     var fin=el('input'); fin.type='date'; fin.value=it.dateFinIso||'';
-    var mk=function(v){ var i=el('input'); i.type='number'; i.min='0'; i.step='500'; i.inputMode='numeric'; i.value=(v===''||v==null)?'':v; return i; };
+    var mk=function(v){ var i=el('input'); i.type='number'; i.min='0'; i.step='1'; i.inputMode='numeric'; i.value=(v===''||v==null)?'':v; return i; };
     var mat=mk(it.materiel), mo=mk(it.mainOeuvre), aut=mk(it.autres);
     var obs=el('textarea'); obs.maxLength=2000; obs.value=it.observations||''; obs.placeholder='Travaux réalisés, pièces changées, recommandations…';
     var tot=el('p','tot');
